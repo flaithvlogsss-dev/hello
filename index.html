@@ -5,803 +5,831 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!-- page:start -->
 <title>Слизевик</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500&family=Unbounded:wght@500&display=swap">
 <style>
   :root {
     color-scheme: dark;
-    --ground: #120E0A;
-    --raise: #221A12;
-    --line: #3A2E21;
-    --line-strong: #5A4731;
-    --text: #EDE3CF;
-    --muted: #A6967D;
-    --accent: #F0BC2A;
-    --on-accent: #1A1206;
-    --serif: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+    --bg: #05070D;
+    --glass: rgba(10, 11, 16, .55);
+    --glass-line: rgba(255, 255, 255, .09);
+    --text: #EEEDF3;
+    --muted: rgba(238, 237, 243, .64);
+    --hover: rgba(255, 255, 255, .09);
+    --focus: #9FF3DA;
+    --display: "Unbounded", "Arial Black", system-ui, sans-serif;
     --sans: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   *, *::before, *::after { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     margin: 0;
-    background: var(--ground);
+    overflow: hidden;
+    background: var(--bg);
     color: var(--text);
-    font: 14.5px/1.55 var(--sans);
+    font: 14px/1.5 var(--sans);
     -webkit-font-smoothing: antialiased;
   }
 
-  .app {
-    height: 100%;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 340px;
-    grid-template-rows: minmax(0, 1fr);
-    gap: 24px;
-    padding: 16px;
-  }
-
-  /* Чашка Петри */
-  .stage {
-    position: relative;
-    min-height: 0;
-    container-type: size;
-    display: grid;
-    place-items: center;
-    background: radial-gradient(closest-side, rgba(240, 188, 42, .07), transparent 75%);
-  }
-  .dish {
-    position: relative;
-    width: calc(min(100cqw, 100cqh) - 28px);
-    aspect-ratio: 1;
-    max-width: 100%;
-    border-radius: 50%;
-    background: #120D08;
-    box-shadow:
-      0 0 0 1px rgba(237, 227, 207, .16),
-      0 0 0 10px rgba(237, 227, 207, .035),
-      0 0 0 11px rgba(237, 227, 207, .12),
-      0 40px 100px -30px rgba(0, 0, 0, .8);
-  }
-  .dish canvas {
-    position: absolute;
+  #gl {
+    position: fixed;
     inset: 0;
     width: 100%;
     height: 100%;
-    border-radius: 50%;
     display: block;
+    touch-action: none;
+    cursor: none;
   }
-  #overlay { cursor: crosshair; touch-action: none; }
-  .dish::after {
+
+  .ring {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    border: 1px solid #fff;
+    border-radius: 50%;
+    mix-blend-mode: difference;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .3s;
+    will-change: transform;
+  }
+  .ring::after {
     content: "";
     position: absolute;
-    inset: -11px;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    margin: -2px 0 0 -2px;
     border-radius: 50%;
-    pointer-events: none;
-    background: conic-gradient(from 210deg,
-      transparent 0deg, rgba(255, 250, 235, .22) 30deg, transparent 70deg,
-      transparent 180deg, rgba(255, 250, 235, .08) 220deg, transparent 260deg);
-    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
-            mask: radial-gradient(farthest-side, transparent calc(100% - 11px), #000 calc(100% - 10px));
+    background: #fff;
   }
 
-  .label {
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    display: grid;
-    gap: 8px;
-    min-width: 200px;
-    padding: 12px 14px;
-    background: rgba(26, 20, 14, .78);
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    backdrop-filter: blur(6px);
-    pointer-events: none;
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-line);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+            backdrop-filter: blur(14px) saturate(140%);
+    transition: opacity .5s;
   }
-  .label .title { margin: 0; font: italic 500 17px/1.1 var(--serif); }
-  .label dl {
-    display: grid;
-    grid-template-columns: auto auto;
-    gap: 2px 18px;
-    margin: 0;
-    font: 12px/1.45 var(--mono);
-    font-variant-numeric: tabular-nums;
+  .brand {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: 16px;
+    max-width: min(380px, calc(100% - 32px));
+    padding: 14px 16px;
+    border-radius: 14px;
+  }
+  .brand h1 { margin: 0; font: 500 18px/1.1 var(--display); letter-spacing: .01em; }
+  .hint {
+    margin: 8px 0 0;
+    max-height: 9em;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.45;
     color: var(--muted);
+    transition: opacity .6s, max-height .6s, margin .6s;
   }
-  .label dt { margin: 0; }
-  .label dd { margin: 0; text-align: right; color: var(--text); }
+  .brand.quiet .hint { opacity: 0; max-height: 0; margin-top: 0; }
 
-  /* Панель */
-  .panel {
-    min-height: 0;
-    overflow-y: auto;
+  .bar {
+    position: fixed;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
     display: flex;
-    flex-direction: column;
-    gap: 22px;
-    padding-block: 8px;
-    padding-right: 6px;
-  }
-  .head h1 {
-    margin: 0;
-    font: 600 48px/1 var(--serif);
-    letter-spacing: -.01em;
-    text-wrap: balance;
-  }
-  .head .bin { margin: 6px 0 0; font: italic 500 19px/1.2 var(--serif); color: var(--accent); }
-  .intro { margin: 0; color: var(--muted); max-width: 60ch; }
-  .group { display: flex; flex-direction: column; gap: 10px; }
-  .eyebrow {
-    margin: 0;
-    font: 600 11px/1 var(--sans);
-    letter-spacing: .09em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .hint { margin: 0; font-size: 13px; color: var(--muted); }
-
-  .seg {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3px;
-    padding: 3px;
-    border: 1px solid var(--line);
-    border-radius: 3px;
-  }
-  .seg label { position: relative; }
-  .seg input { position: absolute; opacity: 0; pointer-events: none; }
-  .seg span {
-    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 9px;
-    border-radius: 2px;
-    color: var(--muted);
-    cursor: pointer;
-    font-weight: 500;
+    gap: 4px;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    padding: 6px;
+    border-radius: 28px;
   }
-  .seg input:checked + span { background: var(--raise); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
-  .seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
-
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip, .btn, .swatch {
-    appearance: none;
-    font: 500 13.5px/1 var(--sans);
-    color: var(--text);
-    background: transparent;
-    border: 1px solid var(--line);
-    border-radius: 3px;
-    cursor: pointer;
-  }
-  .chip { padding: 8px 11px; }
-  .chip:hover, .swatch:hover, .btn:hover { border-color: var(--line-strong); }
-  .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-  .params { display: flex; flex-direction: column; gap: 14px; }
-  .param { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: baseline; }
-  .param label { font-weight: 500; }
-  .param output { font: 12.5px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--text); }
-  .param input { grid-column: 1 / -1; }
-  .param small { grid-column: 1 / -1; font-size: 12px; line-height: 1.35; color: var(--muted); }
-
-  input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 18px;
-    margin: 0;
-    background: transparent;
-    cursor: pointer;
-  }
-  input[type="range"]::-webkit-slider-runnable-track {
-    height: 2px;
-    background: linear-gradient(var(--accent), var(--accent)) 0 / var(--fill, 50%) 100% no-repeat, var(--line);
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 14px;
-    height: 14px;
-    margin-top: -6px;
+  .pals { display: flex; gap: 8px; padding: 0 8px; }
+  .pal {
+    width: 24px;
+    height: 24px;
+    padding: 0;
     border: 0;
     border-radius: 50%;
-    background: var(--accent);
+    background: var(--sw);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
+    cursor: pointer;
   }
-  input[type="range"]::-moz-range-track { height: 2px; background: var(--line); }
-  input[type="range"]::-moz-range-progress { height: 2px; background: var(--accent); }
-  input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--accent); }
-
-  .swatches { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-  .swatch { display: grid; gap: 8px; padding: 8px; text-align: left; }
-  .swatch i { display: block; height: 16px; border-radius: 2px; }
-  .swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-  .btn { padding: 11px 14px; background: var(--raise); font-size: 14px; }
-  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); min-width: 120px; }
-  .foot { margin: auto 0 0; font-size: 12.5px; color: var(--muted); }
-
-  @media (max-width: 820px) {
-    html, body { height: auto; }
-    .app { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; gap: 20px; }
-    .stage {
-      container-type: inline-size;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-      padding-top: 12px;
-    }
-    .dish { width: min(calc(100cqw - 24px), 560px); }
-    .label { position: static; width: min(calc(100cqw - 24px), 560px); }
-    .panel { overflow: visible; padding-right: 0; }
+  .pal[aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
+  .sep { width: 1px; height: 20px; margin: 0 4px; background: var(--glass-line); }
+  .btn {
+    appearance: none;
+    padding: 10px 13px;
+    border: 0;
+    border-radius: 20px;
+    background: transparent;
+    color: var(--text);
+    font: 500 13px/1 var(--sans);
+    cursor: pointer;
   }
+  .btn:hover { background: var(--hover); }
+  .btn kbd { margin-left: 6px; font: inherit; color: var(--muted); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+  body.painting .glass { opacity: .12; }
+  body.painting .bar:hover { opacity: 1; }
+  body.bare .glass { opacity: 0; pointer-events: none; }
+  .show {
+    position: fixed;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    padding: 10px 14px;
+    border-radius: 20px;
+    opacity: .5;
+  }
+  .show:hover { opacity: 1; }
+
+  .fail { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; }
+  .fail p { max-width: 42ch; margin: 0; padding: 18px 20px; border-radius: 14px; }
+
   @media (pointer: coarse) {
-    #overlay { touch-action: pan-y pinch-zoom; }
+    #gl { cursor: auto; }
+    .btn kbd { display: none; }
+  }
+  @media (max-width: 480px) {
+    .brand h1 { font-size: 16px; }
+    .btn { padding: 9px 10px; }
   }
 </style>
 </head>
 <body>
 
-<main class="app">
-  <section class="stage" aria-label="Чашка Петри">
-    <div class="dish" id="dish">
-      <canvas id="sim" role="img" aria-label="Живая модель слизевика в чашке Петри"></canvas>
-      <canvas id="overlay" aria-hidden="true"></canvas>
-    </div>
-    <div class="label">
-      <p class="title">Чашка Петри, Ø 90 мм</p>
-      <dl>
-        <dt>агентов</dt><dd id="s-agents">…</dd>
-        <dt>шагов</dt><dd id="s-steps">…</dd>
-        <dt>кадр</dt><dd id="s-ms">…</dd>
-        <dt>клетка сетки</dt><dd id="s-cell">…</dd>
-      </dl>
-    </div>
-  </section>
+<canvas id="gl" aria-label="Абстрактная живая картина из частиц, реагирует на курсор"></canvas>
+<div class="ring" id="ring" aria-hidden="true"></div>
 
-  <aside class="panel">
-    <header class="head">
-      <h1>Слизевик</h1>
-      <p class="bin">Physarum polycephalum</p>
-    </header>
-    <p class="intro">Тысячи частиц ползают по чашке Петри. У каждой впереди три датчика. Частица чувствует след, оставленный другими, и сворачивает туда, где он сильнее. Из одного этого правила вырастают сети, как у настоящего слизевика.</p>
+<header class="brand glass" id="brand">
+  <h1>Слизевик</h1>
+  <p class="hint" id="hint">Веди курсором, и частицы потянутся следом. Зажми, чтобы закрутить воронку, и отпусти, чтобы взорвать. Колесо меняет радиус, а круги курсором меняют направление вихря.</p>
+</header>
 
-    <section class="group" aria-labelledby="g-tool">
-      <h2 class="eyebrow" id="g-tool">Положить в чашку</h2>
-      <div class="seg" role="radiogroup" aria-labelledby="g-tool">
-        <label>
-          <input type="radio" name="tool" id="tool-oat" value="oat" checked>
-          <span>
-            <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><ellipse cx="8" cy="6" rx="7" ry="4.5" transform="rotate(-18 8 6)" fill="#E8D6A6" stroke="#6B4A1E" stroke-width="1"/></svg>
-            Овсянка
-          </span>
-        </label>
-        <label>
-          <input type="radio" name="tool" id="tool-salt" value="salt">
-          <span>
-            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1.5" y="4" width="5" height="5" transform="rotate(12 4 6.5)" fill="#F4F2EC"/><rect x="7" y="1.5" width="5" height="5" transform="rotate(-20 9.5 4)" fill="#F4F2EC"/><rect x="6" y="8" width="4.5" height="4.5" transform="rotate(30 8.25 10.25)" fill="#F4F2EC"/></svg>
-            Соль
-          </span>
-        </label>
-      </div>
-      <p class="hint">Нажмите на чашку или проведите по ней. Слизевик тянется к овсянке и обходит соль.</p>
-    </section>
-
-    <section class="group" aria-labelledby="g-preset">
-      <h2 class="eyebrow" id="g-preset">Характер узора</h2>
-      <div class="chips" id="presets">
-        <button type="button" class="chip" data-preset="net" aria-pressed="true">Сеть</button>
-        <button type="button" class="chip" data-preset="foam" aria-pressed="false">Пена</button>
-        <button type="button" class="chip" data-preset="veins" aria-pressed="false">Жилки</button>
-        <button type="button" class="chip" data-preset="storm" aria-pressed="false">Буря</button>
-      </div>
-    </section>
-
-    <section class="group" aria-labelledby="g-params">
-      <h2 class="eyebrow" id="g-params">Параметры модели</h2>
-      <div class="params">
-        <div class="param">
-          <label for="p-sa">Угол датчиков</label><output id="o-sa" for="p-sa"></output>
-          <input type="range" id="p-sa" min="5" max="120" step="0.5">
-          <small>Насколько широко частица смотрит в стороны.</small>
-        </div>
-        <div class="param">
-          <label for="p-ra">Поворот</label><output id="o-ra" for="p-ra"></output>
-          <input type="range" id="p-ra" min="5" max="120" step="0.5">
-          <small>Как резко она сворачивает к следу.</small>
-        </div>
-        <div class="param">
-          <label for="p-so">Дальность датчиков</label><output id="o-so" for="p-so"></output>
-          <input type="range" id="p-so" min="2" max="40" step="1">
-          <small>Чем дальше видит частица, тем крупнее узор.</small>
-        </div>
-        <div class="param">
-          <label for="p-ss">Шаг</label><output id="o-ss" for="p-ss"></output>
-          <input type="range" id="p-ss" min="0.5" max="4" step="0.1">
-          <small>Сколько клеток частица проходит за такт.</small>
-        </div>
-        <div class="param">
-          <label for="p-decay">Испарение следа</label><output id="o-decay" for="p-decay"></output>
-          <input type="range" id="p-decay" min="1" max="40" step="1">
-          <small>Как быстро исчезают старые дорожки.</small>
-        </div>
-        <div class="param">
-          <label for="p-speed">Скорость</label><output id="o-speed" for="p-speed"></output>
-          <input type="range" id="p-speed" min="1" max="4" step="1">
-          <small>Сколько тактов модели проходит за кадр.</small>
-        </div>
-      </div>
-    </section>
-
-    <section class="group" aria-labelledby="g-pal">
-      <h2 class="eyebrow" id="g-pal">Краски</h2>
-      <div class="swatches" id="palettes">
-        <button type="button" class="swatch" data-pal="phys" aria-pressed="true"><i></i>Физарум</button>
-        <button type="button" class="swatch" data-pal="agar" aria-pressed="false"><i></i>Агар</button>
-        <button type="button" class="swatch" data-pal="glow" aria-pressed="false"><i></i>Свечение</button>
-        <button type="button" class="swatch" data-pal="cyan" aria-pressed="false"><i></i>Цианотипия</button>
-      </div>
-    </section>
-
-    <section class="group" aria-labelledby="g-seed">
-      <h2 class="eyebrow" id="g-seed">Посеять заново</h2>
-      <div class="chips" id="seeds">
-        <button type="button" class="chip" data-seed="scatter" aria-pressed="true">Россыпь</button>
-        <button type="button" class="chip" data-seed="ring" aria-pressed="false">Кольцо</button>
-        <button type="button" class="chip" data-seed="center" aria-pressed="false">Центр</button>
-      </div>
-    </section>
-
-    <div class="actions">
-      <button type="button" class="btn primary" id="pause">Пауза</button>
-      <button type="button" class="btn" id="clear">Убрать овсянку и соль</button>
-    </div>
-
-    <p class="foot">Агентная модель Джеффа Джонса (2010). Пробел ставит на паузу.</p>
-  </aside>
-</main>
+<nav class="bar glass" aria-label="Управление">
+  <div class="pals" id="pals" role="group" aria-label="Палитра"></div>
+  <span class="sep" aria-hidden="true"></span>
+  <button type="button" class="btn" id="mutate">Мутация<kbd>M</kbd></button>
+  <button type="button" class="btn" id="reseed">Заново<kbd>R</kbd></button>
+  <button type="button" class="btn" id="pause">Пауза<kbd>␣</kbd></button>
+  <button type="button" class="btn" id="hide">Скрыть<kbd>H</kbd></button>
+</nav>
+<button type="button" class="btn glass show" id="show" hidden>Показать панель</button>
 
 <script>
 (() => {
   'use strict';
   const TAU = Math.PI * 2;
   const DEG = Math.PI / 180;
-  const DISH_MM = 90;
 
-  // sa: угол датчиков, ra: угол поворота, so: дальность датчиков, ss: шаг, decay: испарение в %
-  const PRESETS = {
-    net:   { sa: 45, ra: 45, so: 9,  ss: 1,   decay: 10 },
-    foam:  { sa: 60, ra: 60, so: 5,  ss: 1,   decay: 14 },
-    veins: { sa: 25, ra: 12, so: 24, ss: 1.5, decay: 6 },
-    storm: { sa: 75, ra: 30, so: 14, ss: 2.5, decay: 22 },
-  };
-  const PALETTES = {
-    phys: [[0, '#120D08'], [.28, '#3A220C'], [.58, '#A96B11'], [.82, '#F2BE2C'], [1, '#FFF6CC']],
-    agar: [[0, '#C98E2E'], [.35, '#8C5718'], [.7, '#3E220C'], [1, '#140A04']],
-    glow: [[0, '#030B0D'], [.3, '#083434'], [.62, '#169C85'], [.86, '#95F0CB'], [1, '#F2FFF8']],
-    cyan: [[0, '#0C2350'], [.4, '#22508F'], [.76, '#A2BCDC'], [1, '#F5F2E9']],
-  };
-  // Стартовая раскладка: доли радиуса от центра чашки
-  const START = [
-    [-.46, -.18, 'oat'], [.08, -.52, 'oat'], [.5, -.08, 'oat'],
-    [.3, .46, 'oat'], [-.22, .44, 'oat'], [0, 0, 'oat'], [-.58, .28, 'salt'],
+  const PALETTES = [
+    { name: 'Сияние',  bg: '#05070D', c: ['#37F5C9', '#6A5BFF', '#FF4FA3'], ink: false },
+    { name: 'Лава',    bg: '#0B0504', c: ['#FF6A1A', '#FFD23F', '#D81B60'], ink: false },
+    { name: 'Глубина', bg: '#02070C', c: ['#1FB6FF', '#2346FF', '#C8F7FF'], ink: false },
+    { name: 'Жемчуг',  bg: '#070707', c: ['#F3EEE4', '#8E887F', '#D8C6A2'], ink: false },
+    { name: 'Тушь',    bg: '#ECE8E1', c: ['#1C2C74', '#B3261E', '#1A1A1A'], ink: true },
   ];
-  const OAT_EMIT = 3;
-  const SALT = 10;
-  const MAX_SOURCES = 80;
+  const SEEDS = ['mist', 'rings', 'burst'];
 
-  const P = { ...PRESETS.net, speed: 1 };
-  let N, R, C, count, trail, tmp, mask, insideCount, ctx, img, pix;
-  let ax, ay, dx, dy;
-  let oatR, saltR, oatOffs, saltOffs;
-  const lut = new Uint32Array(256);
-  let tone = 1;
-  let sources = [];
-  let running = !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let steps = 0, frameMs = 0, frameNo = 0;
-  let tool = 'oat';
+  // Параметры трёх видов частиц: угол датчиков, поворот, дальность датчиков, шаг, сохранение следа
+  const P = {
+    sa: [25, 45, 35], ra: [40, 45, 25], so: [14, 9, 22], ss: [1.3, 1, 1.6],
+    keep: [.93, .9, .95], cross: -.6,
+  };
+  const T = JSON.parse(JSON.stringify(P));
 
-  const dish = document.getElementById('dish');
-  const sim = document.getElementById('sim');
-  const overlay = document.getElementById('overlay');
-  const octx = overlay.getContext('2d');
-  const nf = new Intl.NumberFormat('ru-RU');
+  // ---------- Шейдеры ----------
+  const UPDATE_VS = `#version 300 es
+precision highp float;
+precision highp int;
+layout(location = 0) in vec4 aAgent;
+uniform sampler2D uTrail;
+uniform vec2 uRes;
+uniform uint uFrame;
+uniform vec3 uSA, uRA, uSO, uSS;
+uniform mat3 uW;
+uniform vec2 uMouse, uVel;
+uniform float uActive, uPull, uBlast, uRadius, uSwirl;
+out vec4 vAgent;
 
-  function diskOffsets(r) {
-    const o = [];
-    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r) o.push(x, y);
-    return o;
+uint hash(uint x) {
+  x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16;
+  return x;
+}
+float pick(vec3 v, int i) { return i == 0 ? v.x : (i == 1 ? v.y : v.z); }
+float angDiff(float a, float b) { float d = a - b; return atan(sin(d), cos(d)); }
+float sense(vec2 p, float a, float dist, vec3 w) {
+  vec2 q = p + vec2(cos(a), sin(a)) * dist;
+  return dot(textureLod(uTrail, q / uRes, 0.0).rgb, w);
+}
+void main() {
+  vec2 p = aAgent.xy;
+  float h = aAgent.z;
+  float s = aAgent.w;
+  int si = int(s + .5);
+  float sa = pick(uSA, si), ra = pick(uRA, si), so = pick(uSO, si);
+  vec3 w = si == 0 ? uW[0] : (si == 1 ? uW[1] : uW[2]);
+
+  float F = sense(p, h, so, w);
+  float L = sense(p, h - sa, so, w);
+  float R = sense(p, h + sa, so, w);
+  float r = float(hash(uint(gl_VertexID) * 747796405u + uFrame * 2891336453u) & 0xffffu) / 65535.0;
+  if (F > L && F > R) {}
+  else if (F < L && F < R) h += r < .5 ? -ra : ra;
+  else if (L > R) h -= ra;
+  else if (R > L) h += ra;
+
+  float spd = pick(uSS, si);
+  vec2 d = uMouse - p;
+  d -= uRes * round(d / uRes);
+  float d2 = dot(d, d);
+  float rr = uRadius * uRadius;
+  float fall = exp(-d2 / rr);
+  float wide = exp(-d2 / (rr * 3.0));
+  if (wide > .001) {
+    float toC = atan(d.y, d.x);
+    float orbit = toC - uSwirl * mix(1.3, .55, uPull);
+    h += angDiff(orbit, h) * clamp(fall * .22 * uActive + wide * .5 * uPull, 0.0, 1.0);
+    float vl = length(uVel);
+    if (vl > .05) h += angDiff(atan(uVel.y, uVel.x), h) * fall * min(vl / 12.0, 1.0) * .45 * uActive;
+    if (uBlast > .001) h += angDiff(toC + 3.14159265, h) * min(1.0, wide * uBlast * 1.5);
+    spd *= 1.0 + fall * (.7 * uActive + 1.2 * uPull) + wide * uBlast * 4.0;
+  }
+  p = mod(p + vec2(cos(h), sin(h)) * spd, uRes);
+  vAgent = vec4(p, mod(h, 6.28318531), s);
+  gl_Position = vec4(0.0);
+  gl_PointSize = 1.0;
+}`;
+
+  const NULL_FS = `#version 300 es
+precision mediump float;
+out vec4 o;
+void main() { o = vec4(0.0); }`;
+
+  const DEPOSIT_VS = `#version 300 es
+precision highp float;
+layout(location = 0) in vec4 aAgent;
+uniform vec2 uRes;
+uniform float uDep;
+out vec3 vC;
+void main() {
+  gl_Position = vec4(aAgent.xy / uRes * 2.0 - 1.0, 0.0, 1.0);
+  gl_PointSize = 1.0;
+  int s = int(aAgent.w + .5);
+  vC = (s == 0 ? vec3(1, 0, 0) : (s == 1 ? vec3(0, 1, 0) : vec3(0, 0, 1))) * uDep;
+}`;
+
+  const DEPOSIT_FS = `#version 300 es
+precision highp float;
+in vec3 vC;
+out vec4 o;
+void main() { o = vec4(vC, 0.0); }`;
+
+  const FULL_VS = `#version 300 es
+out vec2 vUv;
+void main() {
+  vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  vUv = p;
+  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
+}`;
+
+  const DIFFUSE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D uTrail;
+uniform vec2 uRes;
+uniform vec3 uKeep;
+uniform float uBias;
+uniform vec2 uA, uB;
+uniform float uBrush;
+uniform vec3 uInk;
+out vec4 o;
+void main() {
+  vec2 px = gl_FragCoord.xy;
+  vec2 tx = 1.0 / uRes;
+  vec2 uv = px * tx;
+  vec3 sum = vec3(0.0);
+  for (int y = -1; y <= 1; y++)
+    for (int x = -1; x <= 1; x++)
+      sum += textureLod(uTrail, uv + vec2(x, y) * tx, 0.0).rgb;
+  vec3 c = max(sum / 9.0 * uKeep - uBias, 0.0);
+  if (dot(uInk, uInk) > 0.0) {
+    vec2 pa = px - uA, ba = uB - uA;
+    float t = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
+    vec2 q = pa - ba * t;
+    c += uInk * exp(-dot(q, q) / (uBrush * uBrush));
+  }
+  o = vec4(min(c, vec3(60000.0)), 1.0);
+}`;
+
+  const DISPLAY_FS = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uTrail;
+uniform vec3 uBg, uC0, uC1, uC2, uExp;
+uniform float uInk, uTime;
+out vec4 o;
+float hash(vec2 p) {
+  p = fract(p * vec2(443.897, 441.423));
+  p += dot(p, p.yx + 19.19);
+  return fract((p.x + p.y) * p.x);
+}
+void main() {
+  vec3 t = max(textureLod(uTrail, vUv, 0.0).rgb, 0.0);
+  vec3 b = max(textureLod(uTrail, vUv, 2.0).rgb * .5
+             + textureLod(uTrail, vUv, 4.0).rgb * .35
+             + textureLod(uTrail, vUv, 6.0).rgb * .3, 0.0);
+  vec3 a = (1.0 - exp(-t * uExp)) + (1.0 - exp(-b * uExp * .7)) * .55;
+  vec3 col;
+  if (uInk < .5) {
+    vec3 lin = uC0 * a.r + uC1 * a.g + uC2 * a.b;
+    col = uBg + (1.0 - exp(-lin * 1.3));
+  } else {
+    vec3 ab = (1.0 - uC0) * a.r + (1.0 - uC1) * a.g + (1.0 - uC2) * a.b;
+    col = uBg * exp(-ab * 1.5);
+  }
+  vec2 q = vUv - .5;
+  col *= 1.0 - dot(q, q) * (uInk < .5 ? .9 : .35);
+  col += (hash(gl_FragCoord.xy + fract(uTime) * 100.0) - .5) * (1.5 / 255.0);
+  o = vec4(col, 1.0);
+}`;
+
+  // ---------- DOM ----------
+  const canvas = document.getElementById('gl');
+  const ring = document.getElementById('ring');
+  const brand = document.getElementById('brand');
+  const hint = document.getElementById('hint');
+  const palsEl = document.getElementById('pals');
+  const pauseBtn = document.getElementById('pause');
+  const showBtn = document.getElementById('show');
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  if (coarse) {
+    hint.textContent = 'Веди пальцем, и частицы потянутся следом. Удерживай, чтобы закрутить воронку, и отпусти, чтобы взорвать. Круги пальцем меняют направление вихря.';
   }
 
-  function init() {
-    const D = dish.getBoundingClientRect().width || 600;
-    N = D >= 640 ? 520 : D >= 420 ? 400 : 300;
-    C = N / 2;
-    R = C - 3;
-    count = Math.round(N * N * 0.22);
-    trail = new Float32Array(N * N);
-    tmp = new Float32Array(N * N);
-    mask = new Float32Array(N * N);
-    insideCount = 0;
-    for (let y = 1; y < N - 1; y++) {
-      for (let x = 1; x < N - 1; x++) {
-        const ox = x + .5 - C, oy = y + .5 - C;
-        if (ox * ox + oy * oy <= R * R) { mask[y * N + x] = 1; insideCount++; }
-      }
+  let gl, progs, emptyVao, tfo;
+  let W = 0, H = 0, simScale = 1, cssW = 0, cssH = 0, count = 0;
+  let bufs = [], vaos = [], texs = [], fbos = [];
+  let cur = 0, tcur = 0, frameNo = 0;
+  let floatTrail = true, dep = 1, bias = 0;
+  let palette = 0, seedIdx = 0, time = 0;
+  let running = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---------- WebGL ----------
+  function compile(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+    return s;
+  }
+  function program(vs, fs, varyings) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+    gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+    if (varyings) gl.transformFeedbackVaryings(p, varyings, gl.INTERLEAVED_ATTRIBS);
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const u = {};
+    const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) {
+      const name = gl.getActiveUniform(p, i).name;
+      u[name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, name);
     }
-    ax = new Float64Array(count); ay = new Float64Array(count);
-    dx = new Float64Array(count); dy = new Float64Array(count);
-    oatR = Math.max(2, Math.round(N / 130));
-    saltR = Math.round(N / 45);
-    oatOffs = diskOffsets(oatR);
-    saltOffs = diskOffsets(saltR);
-    sim.width = sim.height = N;
-    ctx = sim.getContext('2d');
-    img = ctx.createImageData(N, N);
-    pix = new Uint32Array(img.data.buffer);
-    document.getElementById('s-agents').textContent = nf.format(count);
-    document.getElementById('s-cell').textContent =
-      (DISH_MM / N).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' мм';
+    return { p, u };
+  }
+
+  function setup() {
+    gl = canvas.getContext('webgl2', {
+      antialias: false, alpha: false, depth: false, stencil: false,
+      preserveDrawingBuffer: false, powerPreference: 'high-performance',
+    });
+    if (!gl) throw new Error('WebGL2 недоступен');
+    floatTrail = !!gl.getExtension('EXT_color_buffer_float');
+    progs = {
+      upd: program(UPDATE_VS, NULL_FS, ['vAgent']),
+      dep: program(DEPOSIT_VS, DEPOSIT_FS),
+      dif: program(FULL_VS, DIFFUSE_FS),
+      dis: program(FULL_VS, DISPLAY_FS),
+    };
+    emptyVao = gl.createVertexArray();
+    tfo = gl.createTransformFeedback();
+  }
+
+  function makeTrail() {
+    const t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    if (floatTrail) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    const f = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { t, f, ok };
+  }
+
+  function buildSim() {
+    cssW = canvas.clientWidth || innerWidth;
+    cssH = canvas.clientHeight || innerHeight;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    simScale = Math.min(1, Math.sqrt(1.3e6 / (cssW * cssH)));
+    W = Math.max(64, Math.round(cssW * simScale));
+    H = Math.max(64, Math.round(cssH * simScale));
+    count = Math.round(Math.min(1.1e6, Math.max(9e4, W * H * .4)) / 3) * 3;
+
+    for (const t of texs) gl.deleteTexture(t);
+    for (const f of fbos) gl.deleteFramebuffer(f);
+    for (const b of bufs) gl.deleteBuffer(b);
+    for (const v of vaos) gl.deleteVertexArray(v);
+
+    let made = [makeTrail(), makeTrail()];
+    if (floatTrail && !made.every(m => m.ok)) {
+      for (const m of made) { gl.deleteTexture(m.t); gl.deleteFramebuffer(m.f); }
+      floatTrail = false;
+      made = [makeTrail(), makeTrail()];
+    }
+    texs = made.map(m => m.t);
+    fbos = made.map(m => m.f);
+    dep = floatTrail ? 1 : .02;
+    bias = floatTrail ? 0 : .6 / 255;
+
+    bufs = [gl.createBuffer(), gl.createBuffer()];
+    vaos = bufs.map(b => {
+      const v = gl.createVertexArray();
+      gl.bindVertexArray(v);
+      gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferData(gl.ARRAY_BUFFER, count * 16, gl.DYNAMIC_COPY);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 16, 0);
+      return v;
+    });
+    gl.bindVertexArray(null);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    seed(SEEDS[seedIdx]);
+  }
+
+  function clearTrails() {
+    for (const f of fbos) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.viewport(0, 0, W, H);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    for (const t of texs) { gl.bindTexture(gl.TEXTURE_2D, t); gl.generateMipmap(gl.TEXTURE_2D); }
   }
 
   function seed(kind) {
-    trail.fill(0);
-    const Ra = R - 1.5;
-    for (let i = 0; i < count; i++) {
-      let r, a, h;
-      if (kind === 'center') {
-        r = Math.sqrt(Math.random()) * Ra * .1; a = Math.random() * TAU; h = a;
-      } else if (kind === 'ring') {
-        a = Math.random() * TAU; r = Ra * (.7 + (Math.random() - .5) * .05);
-        h = a + Math.PI + (Math.random() - .5) * .6;
+    const a = new Float32Array(count * 4);
+    const m = Math.min(W, H), cx = W / 2, cy = H / 2;
+    for (let i = 0, j = 0; i < count; i++, j += 4) {
+      const s = i % 3;
+      let x, y, h;
+      if (kind === 'burst') {
+        const r = Math.sqrt(Math.random()) * m * .06, t = Math.random() * TAU;
+        x = cx + Math.cos(t) * r; y = cy + Math.sin(t) * r; h = t;
+      } else if (kind === 'rings') {
+        const t = Math.random() * TAU, r = m * (.16 + s * .09) * (1 + (Math.random() - .5) * .03);
+        x = cx + Math.cos(t) * r; y = cy + Math.sin(t) * r; h = t + (s === 1 ? -1 : 1) * Math.PI / 2;
       } else {
-        r = Math.sqrt(Math.random()) * Ra * .97; a = Math.random() * TAU; h = Math.random() * TAU;
+        x = Math.random() * W; y = Math.random() * H; h = Math.random() * TAU;
       }
-      ax[i] = C + Math.cos(a) * r; ay[i] = C + Math.sin(a) * r;
-      dx[i] = Math.cos(h); dy[i] = Math.sin(h);
+      a[j] = x; a[j + 1] = y; a[j + 2] = h; a[j + 3] = s;
     }
-    steps = 0;
+    for (const b of bufs) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, b);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, a);
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    clearTrails();
   }
 
-  // Один такт: каждая частица смотрит тремя датчиками, поворачивает, шагает и оставляет след.
-  function step() {
-    const n = N, t = trail, X = ax, Y = ay, DX = dx, DY = dy, cnt = count, c = C;
-    const so = P.so, ss = P.ss;
-    const cs = Math.cos(P.sa * DEG), sn = Math.sin(P.sa * DEG);
-    const cr = Math.cos(P.ra * DEG), sr = Math.sin(P.ra * DEG);
-    const lim = (R - 1.5) * (R - 1.5);
-    for (let i = 0; i < cnt; i++) {
-      const x = X[i], y = Y[i];
-      let fx = DX[i], fy = DY[i];
-      let sx = (x + fx * so) | 0, sy = (y + fy * so) | 0;
-      const F = (sx >>> 0) < n && (sy >>> 0) < n ? t[sy * n + sx] : 0;
-      const lx = fx * cs + fy * sn, ly = -fx * sn + fy * cs;
-      sx = (x + lx * so) | 0; sy = (y + ly * so) | 0;
-      const L = (sx >>> 0) < n && (sy >>> 0) < n ? t[sy * n + sx] : 0;
-      const rx = fx * cs - fy * sn, ry = fx * sn + fy * cs;
-      sx = (x + rx * so) | 0; sy = (y + ry * so) | 0;
-      const Rt = (sx >>> 0) < n && (sy >>> 0) < n ? t[sy * n + sx] : 0;
-
-      let turn = 0;
-      if (F > L && F > Rt) turn = 0;
-      else if (F < L && F < Rt) turn = Math.random() < .5 ? -1 : 1;
-      else if (L > Rt) turn = -1;
-      else if (Rt > L) turn = 1;
-      if (turn === -1) { const nx = fx * cr + fy * sr; fy = -fx * sr + fy * cr; fx = nx; }
-      else if (turn === 1) { const nx = fx * cr - fy * sr; fy = fx * sr + fy * cr; fx = nx; }
-
-      let nx = x + fx * ss, ny = y + fy * ss;
-      const ox = nx - c, oy = ny - c;
-      if (ox * ox + oy * oy > lim) {
-        const a = Math.atan2(c - y, c - x) + (Math.random() - .5) * 2.4;
-        fx = Math.cos(a); fy = Math.sin(a); nx = x; ny = y;
-      } else {
-        t[(ny | 0) * n + (nx | 0)] += 1;
-      }
-      X[i] = nx; Y[i] = ny; DX[i] = fx; DY[i] = fy;
-    }
+  // Средний уровень следа каждого вида: по нему настраивается яркость и сила «чернил» курсора
+  function means() {
+    const per = count / 3 * dep / (W * H);
+    return P.keep.map(k => per / (1 - k));
   }
 
-  // Размытие 3×3 и испарение следа
-  function diffuse() {
-    const n = N, a = trail, b = tmp, m = mask;
-    const k = (1 - P.decay / 100) / 9;
-    for (let y = 1; y < n - 1; y++) {
-      const row = y * n;
-      for (let x = 1; x < n - 1; x++) { const i = row + x; b[i] = a[i - 1] + a[i] + a[i + 1]; }
-    }
-    for (let y = 1; y < n - 1; y++) {
-      const row = y * n;
-      for (let x = 1; x < n - 1; x++) { const i = row + x; a[i] = (b[i - n] + b[i] + b[i + n]) * k * m[i]; }
-    }
+  // ---------- Курсор ----------
+  const M = {
+    x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0,
+    active: 0, pull: 0, blast: 0, swirl: 1, cross: 0,
+    radiusK: .12, ink: [0, 0, 0], inkAmt: 0, brush: 4, ghostT: 0,
+  };
+  const pointer = { x: 0, y: 0, inside: false, down: false, lastMove: -1e9, lastSeen: -1e9 };
+  let ringFlash = 0;
+
+  function ghostPos(t) {
+    return [
+      W * (.5 + Math.sin(t * .21) * .33 + Math.sin(t * .53) * .07),
+      H * (.5 + Math.sin(t * .17 + 1.3) * .3 + Math.cos(t * .41) * .07),
+    ];
   }
 
-  function applySources() {
-    const n = N, t = trail;
-    for (const s of sources) {
-      const cx = s.x | 0, cy = s.y | 0;
-      const oat = s.type === 'oat';
-      const offs = oat ? oatOffs : saltOffs;
-      for (let j = 0; j < offs.length; j += 2) {
-        const x = cx + offs[j], y = cy + offs[j + 1];
-        if (x < 0 || y < 0 || x >= n || y >= n) continue;
-        const i = y * n + x;
-        if (!mask[i]) continue;
-        if (oat) t[i] += OAT_EMIT; else t[i] = -SALT;
-      }
+  function updateCursor(now, dt) {
+    const user = pointer.inside || pointer.down;
+    const mode = user ? 'user' : (now - pointer.lastSeen > 2500 ? 'ghost' : 'none');
+    let tx = M.x, ty = M.y, act = 0;
+    if (mode === 'user') {
+      tx = pointer.x * simScale;
+      ty = (cssH - pointer.y) * simScale;
+      act = now - pointer.lastMove < 250 ? 1 : .35;
+    } else if (mode === 'ghost') {
+      M.ghostT += dt;
+      [tx, ty] = ghostPos(M.ghostT);
+      act = .75;
     }
+    M.active += (act - M.active) * Math.min(1, dt * 6);
+
+    const f = Math.max(dt * 60, .25);
+    let vx = (tx - M.x) / f, vy = (ty - M.y) / f;
+    M.px = M.x; M.py = M.y; M.x = tx; M.y = ty;
+    const jump = Math.hypot(vx, vy) * f > Math.min(W, H) * .25;
+    if (jump) { vx = vy = 0; M.px = M.x; M.py = M.y; }
+    const ovx = M.vx, ovy = M.vy;
+    M.vx = M.vx * .6 + vx * .4;
+    M.vy = M.vy * .6 + vy * .4;
+    const sp = Math.hypot(M.vx, M.vy), osp = Math.hypot(ovx, ovy);
+    if (sp > .3 && osp > .3) {
+      M.cross = M.cross * .92 + (ovx * M.vy - ovy * M.vx) / (sp * osp) * .08;
+      if (Math.abs(M.cross) > .06) M.swirl += (Math.sign(M.cross) - M.swirl) * .05;
+    }
+
+    if (pointer.down) M.pull = Math.min(1, M.pull + dt * 1.6);
+    else if (M.pull > 0) { M.blast = Math.max(M.blast, M.pull); M.pull = 0; ringFlash = 1; }
+    M.blast *= Math.exp(-dt * 3);
+    ringFlash *= Math.exp(-dt * 4);
+
+    const ph = time * .35;
+    const unit = means().reduce((a, b) => a + b) / 3;
+    const k = mode === 'none' ? 0 : unit * (Math.min(sp, 25) * .12 * M.active + (pointer.down ? 1.6 : 0));
+    M.ink = [Math.max(0, Math.cos(ph)), Math.max(0, Math.cos(ph - 2.094)), Math.max(0, Math.cos(ph + 2.094))].map(v => v * k);
+    M.brush = 4 + Math.min(sp, 30) * .5 + (pointer.down ? 6 : 0);
+
+    // Кольцо вокруг курсора
+    const show = mode === 'user' && (!coarse || pointer.down);
+    const rCss = M.radiusK * Math.min(W, H) / simScale;
+    const scale = 1 - .45 * M.pull + .6 * M.blast;
+    ring.style.width = ring.style.height = (rCss * 2) + 'px';
+    ring.style.transform = `translate(${pointer.x - rCss}px, ${pointer.y - rCss}px) scale(${scale})`;
+    ring.style.opacity = show ? String(Math.min(1, .28 + .45 * M.pull + .5 * ringFlash)) : '0';
   }
 
-  function render(snap) {
-    const t = trail, px = pix, L = lut, len = N * N, c = tone;
-    const bg = L[0];
-    let sum = 0;
-    for (let i = 0; i < len; i++) {
-      const v = t[i];
-      if (v > 0) { sum += v; px[i] = L[(v / (v + c) * 255) | 0]; }
-      else px[i] = bg;
+  // ---------- Мутации ----------
+  const rand = (a, b) => a + Math.random() * (b - a);
+  function mutate() {
+    for (let i = 0; i < 3; i++) {
+      T.sa[i] = rand(12, 70); T.ra[i] = rand(12, 80); T.so[i] = rand(5, 30);
+      T.ss[i] = rand(.7, 2.1); T.keep[i] = rand(.88, .965);
     }
-    ctx.putImageData(img, 0, 0);
-    // Экспозиция подстраивается под среднюю яркость следа
-    const target = Math.max(.05, sum / insideCount * 2.5);
-    tone = snap ? target : tone + (target - tone) * .08;
+    T.cross = rand(-1, .25);
+  }
+  function lerpParams(dt) {
+    const k = 1 - Math.exp(-dt * 2.5);
+    for (const key of ['sa', 'ra', 'so', 'ss', 'keep']) {
+      for (let i = 0; i < 3; i++) P[key][i] += (T[key][i] - P[key][i]) * k;
+    }
+    P.cross += (T.cross - P.cross) * k;
   }
 
-  function hexRgb(h) {
+  // ---------- Кадр ----------
+  function simStep(withCursor) {
+    const up = progs.upd;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.useProgram(up.p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
+    gl.uniform1i(up.u.uTrail, 0);
+    gl.uniform2f(up.u.uRes, W, H);
+    gl.uniform1ui(up.u.uFrame, frameNo++);
+    gl.uniform3f(up.u.uSA, P.sa[0] * DEG, P.sa[1] * DEG, P.sa[2] * DEG);
+    gl.uniform3f(up.u.uRA, P.ra[0] * DEG, P.ra[1] * DEG, P.ra[2] * DEG);
+    gl.uniform3f(up.u.uSO, P.so[0], P.so[1], P.so[2]);
+    gl.uniform3f(up.u.uSS, P.ss[0], P.ss[1], P.ss[2]);
+    const c = P.cross;
+    gl.uniformMatrix3fv(up.u.uW, false, [1, c, c, c, 1, c, c, c, 1]);
+    gl.uniform2f(up.u.uMouse, M.x, M.y);
+    gl.uniform2f(up.u.uVel, M.vx, M.vy);
+    gl.uniform1f(up.u.uActive, withCursor ? M.active : 0);
+    gl.uniform1f(up.u.uPull, withCursor ? M.pull : 0);
+    gl.uniform1f(up.u.uBlast, withCursor ? M.blast : 0);
+    gl.uniform1f(up.u.uRadius, M.radiusK * Math.min(W, H));
+    gl.uniform1f(up.u.uSwirl, M.swirl);
+
+    gl.bindVertexArray(vaos[cur]);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, tfo);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, bufs[1 - cur]);
+    gl.enable(gl.RASTERIZER_DISCARD);
+    gl.beginTransformFeedback(gl.POINTS);
+    gl.drawArrays(gl.POINTS, 0, count);
+    gl.endTransformFeedback();
+    gl.disable(gl.RASTERIZER_DISCARD);
+    gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
+    gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+    cur = 1 - cur;
+
+    // След
+    const dp = progs.dep;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbos[tcur]);
+    gl.viewport(0, 0, W, H);
+    gl.useProgram(dp.p);
+    gl.uniform2f(dp.u.uRes, W, H);
+    gl.uniform1f(dp.u.uDep, dep);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.bindVertexArray(vaos[cur]);
+    gl.drawArrays(gl.POINTS, 0, count);
+    gl.disable(gl.BLEND);
+
+    // Размытие, испарение и мазок курсора
+    const df = progs.dif;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbos[1 - tcur]);
+    gl.useProgram(df.p);
+    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
+    gl.uniform1i(df.u.uTrail, 0);
+    gl.uniform2f(df.u.uRes, W, H);
+    gl.uniform3f(df.u.uKeep, P.keep[0], P.keep[1], P.keep[2]);
+    gl.uniform1f(df.u.uBias, bias);
+    gl.uniform2f(df.u.uA, M.px, M.py);
+    gl.uniform2f(df.u.uB, M.x, M.y);
+    gl.uniform1f(df.u.uBrush, M.brush);
+    if (withCursor) gl.uniform3f(df.u.uInk, M.ink[0], M.ink[1], M.ink[2]);
+    else gl.uniform3f(df.u.uInk, 0, 0, 0);
+    gl.bindVertexArray(emptyVao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    tcur = 1 - tcur;
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
+    gl.generateMipmap(gl.TEXTURE_2D);
+  }
+
+  function hexVec(h) {
     const v = parseInt(h.slice(1), 16);
-    return [v >> 16 & 255, v >> 8 & 255, v & 255];
-  }
-  function buildLut(stops) {
-    for (let i = 0; i < 256; i++) {
-      const u = i / 255;
-      let j = 0;
-      while (j < stops.length - 2 && u > stops[j + 1][0]) j++;
-      const [p0, c0] = stops[j], [p1, c1] = stops[j + 1];
-      const f = Math.min(1, Math.max(0, (u - p0) / (p1 - p0)));
-      const a = hexRgb(c0), b = hexRgb(c1);
-      const r = Math.round(a[0] + (b[0] - a[0]) * f);
-      const g = Math.round(a[1] + (b[1] - a[1]) * f);
-      const bl = Math.round(a[2] + (b[2] - a[2]) * f);
-      lut[i] = (255 << 24) | (bl << 16) | (g << 8) | r;
-    }
-    dish.style.background = stops[0][1];
-  }
-  function gradientCss(stops) {
-    return 'linear-gradient(90deg, ' + stops.map(([p, c]) => c + ' ' + p * 100 + '%').join(', ') + ')';
+    return [(v >> 16 & 255) / 255, (v >> 8 & 255) / 255, (v & 255) / 255];
   }
 
-  // Овсянка и соль рисуются поверх модели в полном разрешении экрана
-  function sizeOverlay() {
-    const w = dish.getBoundingClientRect().width;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    overlay.width = overlay.height = Math.max(1, Math.round(w * dpr));
-    drawOverlay();
-  }
-  function drawOverlay() {
-    const W = overlay.width, k = W / N;
-    octx.clearRect(0, 0, W, W);
-    for (const s of sources) {
-      const x = s.x * k, y = s.y * k;
-      if (s.type === 'oat') {
-        const rx = oatR * k * 2.2, ry = rx * .66;
-        octx.save();
-        octx.translate(x, y);
-        octx.rotate(s.rot);
-        octx.beginPath();
-        octx.ellipse(0, 0, rx, ry, 0, 0, TAU);
-        octx.fillStyle = '#E8D6A6';
-        octx.fill();
-        octx.lineWidth = Math.max(1, k * .4);
-        octx.strokeStyle = 'rgba(92, 60, 22, .6)';
-        octx.stroke();
-        octx.beginPath();
-        octx.moveTo(-rx * .55, ry * .1);
-        octx.quadraticCurveTo(0, -ry * .4, rx * .55, ry * .1);
-        octx.strokeStyle = 'rgba(150, 110, 50, .55)';
-        octx.stroke();
-        octx.restore();
-      } else {
-        octx.beginPath();
-        octx.arc(x, y, saltR * k, 0, TAU);
-        octx.setLineDash([k * 1.4, k * 1.8]);
-        octx.lineWidth = Math.max(1, k * .35);
-        octx.strokeStyle = 'rgba(245, 242, 234, .3)';
-        octx.stroke();
-        octx.setLineDash([]);
-        for (const g of s.grains) {
-          const z = g.z * k;
-          octx.save();
-          octx.translate(x + g.x * k, y + g.y * k);
-          octx.rotate(g.r);
-          octx.fillStyle = 'rgba(246, 244, 238, .95)';
-          octx.fillRect(-z / 2, -z / 2, z, z);
-          octx.lineWidth = Math.max(.5, k * .2);
-          octx.strokeStyle = 'rgba(60, 60, 60, .4)';
-          octx.strokeRect(-z / 2, -z / 2, z, z);
-          octx.restore();
-        }
-      }
-    }
+  function draw() {
+    const pal = PALETTES[palette];
+    const ds = progs.dis;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(ds.p);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
+    gl.uniform1i(ds.u.uTrail, 0);
+    gl.uniform3fv(ds.u.uBg, hexVec(pal.bg));
+    gl.uniform3fv(ds.u.uC0, hexVec(pal.c[0]));
+    gl.uniform3fv(ds.u.uC1, hexVec(pal.c[1]));
+    gl.uniform3fv(ds.u.uC2, hexVec(pal.c[2]));
+    const k = pal.ink ? .3 : .38;
+    const m = means();
+    gl.uniform3f(ds.u.uExp, k / m[0], k / m[1], k / m[2]);
+    gl.uniform1f(ds.u.uInk, pal.ink ? 1 : 0);
+    gl.uniform1f(ds.u.uTime, time);
+    gl.bindVertexArray(emptyVao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
-  function addSource(type, x, y) {
-    const s = { type, x, y, rot: Math.random() * Math.PI };
-    if (type === 'salt') {
-      s.grains = Array.from({ length: 5 }, () => ({
-        x: (Math.random() - .5) * saltR * .8,
-        y: (Math.random() - .5) * saltR * .8,
-        r: Math.random() * Math.PI,
-        z: 2.2 + Math.random() * 1.6,
-      }));
-    }
-    sources.push(s);
-    if (sources.length > MAX_SOURCES) sources.shift();
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000);
+    last = now;
+    if (running) time += dt;
+    updateCursor(now, dt);
+    lerpParams(dt);
+    if (running) simStep(true);
+    draw();
+    requestAnimationFrame(frame);
   }
 
-  function place(p) {
-    const ox = p.x - C, oy = p.y - C;
-    if (ox * ox + oy * oy > (R - 4) * (R - 4)) return false;
-    addSource(tool, p.x, p.y);
-    drawOverlay();
-    if (!running) { applySources(); render(); }
-    return true;
+  // ---------- Управление ----------
+  function setPalette(i) {
+    palette = i;
+    document.body.style.background = PALETTES[i].bg;
+    for (const b of palsEl.children) b.setAttribute('aria-pressed', String(+b.dataset.i === i));
   }
-
-  function toSim(e) {
-    const r = overlay.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / r.width * N, y: (e.clientY - r.top) / r.height * N };
-  }
-
-  let drag = null;
-  overlay.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    const p = toSim(e);
-    if (e.pointerType === 'touch') { drag = { touch: true, sx: e.clientX, sy: e.clientY, p }; return; }
-    overlay.setPointerCapture(e.pointerId);
-    drag = { last: place(p) ? p : null };
+  PALETTES.forEach((p, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pal';
+    b.dataset.i = i;
+    b.title = `${p.name} (${i + 1})`;
+    b.setAttribute('aria-label', p.name);
+    b.style.setProperty('--sw',
+      `radial-gradient(circle, ${p.bg} 0 28%, transparent 30%), conic-gradient(${p.c[0]} 0 33%, ${p.c[1]} 0 66%, ${p.c[2]} 0)`);
+    b.addEventListener('click', () => setPalette(i));
+    palsEl.appendChild(b);
   });
-  overlay.addEventListener('pointermove', e => {
-    if (!drag || drag.touch) return;
-    const p = toSim(e);
-    const gap = tool === 'oat' ? oatR * 5 : saltR * 1.4;
-    if (!drag.last || Math.hypot(p.x - drag.last.x, p.y - drag.last.y) >= gap) {
-      if (place(p)) drag.last = p;
-    }
-  });
-  overlay.addEventListener('pointerup', e => {
-    if (drag && drag.touch && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) < 12) place(drag.p);
-    drag = null;
-  });
-  overlay.addEventListener('pointercancel', () => { drag = null; });
 
-  // Панель
-  const PARAMS = [
-    { key: 'sa', fmt: v => fmt(v, 1) + '°' },
-    { key: 'ra', fmt: v => fmt(v, 1) + '°' },
-    { key: 'so', fmt: v => fmt(v, 0) + ' кл.' },
-    { key: 'ss', fmt: v => fmt(v, 1) + ' кл.' },
-    { key: 'decay', fmt: v => fmt(v, 0) + ' %' },
-    { key: 'speed', fmt: v => '×' + v },
-  ];
-  function fmt(v, d) { return v.toLocaleString('ru-RU', { maximumFractionDigits: d }); }
-  function paintSlider(el) {
-    const f = (el.value - el.min) / (el.max - el.min) * 100;
-    el.style.setProperty('--fill', f + '%');
-  }
-  function syncSliders() {
-    for (const p of PARAMS) {
-      const el = document.getElementById('p-' + p.key);
-      el.value = P[p.key];
-      paintSlider(el);
-      document.getElementById('o-' + p.key).textContent = p.fmt(P[p.key]);
-    }
-  }
-  function markPressed(container, attr, value) {
-    for (const b of container.querySelectorAll('[' + attr + ']')) {
-      b.setAttribute('aria-pressed', String(b.getAttribute(attr) === value));
-    }
-  }
-  function markPreset() {
-    const hit = Object.keys(PRESETS).find(k =>
-      ['sa', 'ra', 'so', 'ss', 'decay'].every(f => Math.abs(PRESETS[k][f] - P[f]) < 1e-6));
-    markPressed(presetsEl, 'data-preset', hit || '');
-  }
-
-  const presetsEl = document.getElementById('presets');
-  const palettesEl = document.getElementById('palettes');
-  const seedsEl = document.getElementById('seeds');
-  const pauseBtn = document.getElementById('pause');
-
-  for (const p of PARAMS) {
-    const el = document.getElementById('p-' + p.key);
-    el.addEventListener('input', () => {
-      P[p.key] = parseFloat(el.value);
-      document.getElementById('o-' + p.key).textContent = p.fmt(P[p.key]);
-      paintSlider(el);
-      markPreset();
-    });
-  }
-  presetsEl.addEventListener('click', e => {
-    const b = e.target.closest('[data-preset]');
-    if (!b) return;
-    Object.assign(P, PRESETS[b.dataset.preset]);
-    syncSliders();
-    markPreset();
-  });
-  for (const b of palettesEl.querySelectorAll('[data-pal]')) {
-    b.querySelector('i').style.background = gradientCss(PALETTES[b.dataset.pal]);
-  }
-  palettesEl.addEventListener('click', e => {
-    const b = e.target.closest('[data-pal]');
-    if (!b) return;
-    buildLut(PALETTES[b.dataset.pal]);
-    markPressed(palettesEl, 'data-pal', b.dataset.pal);
-    if (!running) render();
-  });
-  seedsEl.addEventListener('click', e => {
-    const b = e.target.closest('[data-seed]');
-    if (!b) return;
-    seed(b.dataset.seed);
-    markPressed(seedsEl, 'data-seed', b.dataset.seed);
-    updateStats();
-    if (!running) render(true);
-  });
-  for (const r of document.querySelectorAll('input[name="tool"]')) {
-    r.addEventListener('change', () => { if (r.checked) tool = r.value; });
-  }
   function setRunning(v) {
     running = v;
-    pauseBtn.textContent = running ? 'Пауза' : 'Продолжить';
+    pauseBtn.firstChild.textContent = running ? 'Пауза' : 'Пуск';
   }
+  function reseed() {
+    seedIdx = (seedIdx + 1) % SEEDS.length;
+    seed(SEEDS[seedIdx]);
+  }
+  function setBare(v) {
+    document.body.classList.toggle('bare', v);
+    showBtn.hidden = !v;
+  }
+  document.getElementById('mutate').addEventListener('click', mutate);
+  document.getElementById('reseed').addEventListener('click', reseed);
   pauseBtn.addEventListener('click', () => setRunning(!running));
-  document.getElementById('clear').addEventListener('click', () => {
-    sources = [];
-    drawOverlay();
-  });
+  document.getElementById('hide').addEventListener('click', () => setBare(true));
+  showBtn.addEventListener('click', () => setBare(false));
+
   document.addEventListener('keydown', e => {
-    if (e.code === 'Space' && (e.target === document.body || e.target === document.documentElement)) {
-      e.preventDefault();
-      setRunning(!running);
-    }
+    if (e.target.closest && e.target.closest('button') && (e.code === 'Space' || e.code === 'Enter')) return;
+    if (e.code === 'Space') { e.preventDefault(); setRunning(!running); }
+    else if (e.code === 'KeyR') reseed();
+    else if (e.code === 'KeyM') mutate();
+    else if (e.code === 'KeyH') setBare(!document.body.classList.contains('bare'));
+    else if (/^Digit[1-5]$/.test(e.code)) setPalette(+e.code.slice(5) - 1);
   });
 
-  function updateStats() {
-    document.getElementById('s-steps').textContent = nf.format(steps);
-    document.getElementById('s-ms').textContent = frameMs
-      ? frameMs.toLocaleString('ru-RU', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' мс'
-      : '…';
+  let quietTimer = 0;
+  function quietSoon(ms) {
+    if (quietTimer) return;
+    quietTimer = setTimeout(() => brand.classList.add('quiet'), ms);
+  }
+  canvas.addEventListener('pointermove', e => {
+    pointer.x = e.clientX; pointer.y = e.clientY;
+    pointer.inside = true;
+    pointer.lastMove = pointer.lastSeen = performance.now();
+    quietSoon(9000);
+  });
+  canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    pointer.x = e.clientX; pointer.y = e.clientY;
+    pointer.inside = true;
+    pointer.down = true;
+    pointer.lastMove = pointer.lastSeen = performance.now();
+    canvas.setPointerCapture(e.pointerId);
+    document.body.classList.add('painting');
+    quietSoon(2500);
+  });
+  function release(e) {
+    pointer.down = false;
+    pointer.lastSeen = performance.now();
+    if (e.pointerType !== 'mouse') pointer.inside = false;
+    document.body.classList.remove('painting');
+  }
+  canvas.addEventListener('pointerup', release);
+  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('pointerleave', e => {
+    if (e.pointerType === 'mouse' && !pointer.down) { pointer.inside = false; pointer.lastSeen = performance.now(); }
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    M.radiusK = Math.min(.35, Math.max(.04, M.radiusK * Math.exp(-e.deltaY * .0012)));
+    ringFlash = 1;
+  }, { passive: false });
+
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (Math.abs(canvas.clientWidth - cssW) > 2 || Math.abs(canvas.clientHeight - cssH) > 2) buildSim();
+    }, 250);
+  });
+
+  canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); running = false; });
+  canvas.addEventListener('webglcontextrestored', () => { setup(); buildSim(); setRunning(true); });
+
+  function fail(err) {
+    console.error(err);
+    const box = document.createElement('div');
+    box.className = 'fail';
+    box.innerHTML = '<p class="glass">Этому браузеру не хватает WebGL2, поэтому картина не запустится. Откройте страницу в свежем Chrome, Safari или Firefox.</p>';
+    document.body.appendChild(box);
+    document.querySelector('.bar').hidden = true;
   }
 
-  function tick() {
-    if (running) {
-      const t0 = performance.now();
-      for (let s = 0; s < P.speed; s++) { step(); diffuse(); applySources(); }
-      steps += P.speed;
-      render();
-      const dt = performance.now() - t0;
-      frameMs = frameMs ? frameMs * .9 + dt * .1 : dt;
-      if (++frameNo % 12 === 0) updateStats();
-    }
-    requestAnimationFrame(tick);
+  // ---------- Запуск ----------
+  try {
+    setup();
+    buildSim();
+    for (let i = 0; i < 140; i++) simStep(false);
+    setPalette(0);
+    setRunning(running);
+    requestAnimationFrame(frame);
+  } catch (err) {
+    fail(err);
   }
-
-  // Запуск
-  init();
-  buildLut(PALETTES.phys);
-  seed('scatter');
-  for (const [u, v, type] of START) addSource(type, C + u * R, C + v * R);
-  const warm0 = performance.now();
-  let warm = 0;
-  while (warm < 160 && performance.now() - warm0 < 300) { step(); diffuse(); applySources(); warm++; }
-  steps = warm;
-  render(true);
-  syncSliders();
-  setRunning(running);
-  updateStats();
-  sizeOverlay();
-  new ResizeObserver(sizeOverlay).observe(dish);
-  requestAnimationFrame(tick);
 })();
 </script>
 <!-- page:end -->
