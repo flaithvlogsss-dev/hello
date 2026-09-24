@@ -15,6 +15,7 @@
     --text: #EEEDF3;
     --muted: rgba(238, 237, 243, .64);
     --hover: rgba(255, 255, 255, .09);
+    --on: rgba(255, 255, 255, .16);
     --focus: #9FF3DA;
     --display: "Unbounded", "Arial Black", system-ui, sans-serif;
     --sans: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -38,6 +39,9 @@
     display: block;
     touch-action: none;
     cursor: none;
+    -webkit-user-select: none;
+            user-select: none;
+    -webkit-touch-callout: none;
   }
 
   .ring {
@@ -77,14 +81,14 @@
     position: fixed;
     top: calc(16px + env(safe-area-inset-top, 0px));
     left: 16px;
-    max-width: min(380px, calc(100% - 32px));
+    max-width: min(390px, calc(100% - 32px));
     padding: 14px 16px;
     border-radius: 14px;
   }
   .brand h1 { margin: 0; font: 500 18px/1.1 var(--display); letter-spacing: .01em; }
   .hint {
     margin: 8px 0 0;
-    max-height: 9em;
+    max-height: 12em;
     overflow: hidden;
     font-size: 13px;
     line-height: 1.45;
@@ -129,9 +133,12 @@
     background: transparent;
     color: var(--text);
     font: 500 13px/1 var(--sans);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
     cursor: pointer;
   }
   .btn:hover { background: var(--hover); }
+  .btn[aria-pressed="true"] { background: var(--on); }
   .btn kbd { margin-left: 6px; font: inherit; color: var(--muted); }
   :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
@@ -155,20 +162,20 @@
     #gl { cursor: auto; }
     .btn kbd { display: none; }
   }
-  @media (max-width: 480px) {
+  @media (max-width: 520px) {
     .brand h1 { font-size: 16px; }
     .btn { padding: 9px 10px; }
+    .pals { gap: 6px; }
   }
 </style>
 </head>
 <body>
 
 <canvas id="gl" aria-label="Абстрактная живая картина из частиц, реагирует на курсор"></canvas>
-<div class="ring" id="ring" aria-hidden="true"></div>
 
 <header class="brand glass" id="brand">
   <h1>Слизевик</h1>
-  <p class="hint" id="hint">Веди курсором, и частицы потянутся следом. Зажми, чтобы закрутить воронку, и отпусти, чтобы взорвать. Колесо меняет радиус, а круги курсором меняют направление вихря.</p>
+  <p class="hint" id="hint">Веди курсором, и частицы потянутся следом. Зажми, чтобы закрутить воронку, и отпусти, чтобы взорвать. Правая кнопка отталкивает, двойной клик запускает сверхновую, а если потрясти мышь, узор рассыплется.</p>
 </header>
 
 <nav class="bar glass" aria-label="Управление">
@@ -176,6 +183,8 @@
   <span class="sep" aria-hidden="true"></span>
   <button type="button" class="btn" id="mutate">Мутация<kbd>M</kbd></button>
   <button type="button" class="btn" id="reseed">Заново<kbd>R</kbd></button>
+  <button type="button" class="btn" id="sym">Симметрия ×1<kbd>K</kbd></button>
+  <button type="button" class="btn" id="sound" aria-pressed="false">Звук<kbd>S</kbd></button>
   <button type="button" class="btn" id="pause">Пауза<kbd>␣</kbd></button>
   <button type="button" class="btn" id="hide">Скрыть<kbd>H</kbd></button>
 </nav>
@@ -186,15 +195,17 @@
   'use strict';
   const TAU = Math.PI * 2;
   const DEG = Math.PI / 180;
+  const MAX_HANDS = 8;
 
   const PALETTES = [
-    { name: 'Сияние',  bg: '#05070D', c: ['#37F5C9', '#6A5BFF', '#FF4FA3'], ink: false },
-    { name: 'Лава',    bg: '#0B0504', c: ['#FF6A1A', '#FFD23F', '#D81B60'], ink: false },
-    { name: 'Глубина', bg: '#02070C', c: ['#1FB6FF', '#2346FF', '#C8F7FF'], ink: false },
-    { name: 'Жемчуг',  bg: '#070707', c: ['#F3EEE4', '#8E887F', '#D8C6A2'], ink: false },
-    { name: 'Тушь',    bg: '#ECE8E1', c: ['#1C2C74', '#B3261E', '#1A1A1A'], ink: true },
+    { name: 'Сияние',  bg: '#05070D', c: ['#37F5C9', '#6A5BFF', '#FF4FA3'], ink: false, chord: [55, 82.41, 110, 130.81] },
+    { name: 'Лава',    bg: '#0B0504', c: ['#FF6A1A', '#FFD23F', '#D81B60'], ink: false, chord: [36.71, 55, 73.42, 87.31] },
+    { name: 'Глубина', bg: '#02070C', c: ['#1FB6FF', '#2346FF', '#C8F7FF'], ink: false, chord: [41.2, 61.74, 82.41, 103.83] },
+    { name: 'Жемчуг',  bg: '#070707', c: ['#F3EEE4', '#8E887F', '#D8C6A2'], ink: false, chord: [65.41, 98, 130.81, 164.81] },
+    { name: 'Тушь',    bg: '#ECE8E1', c: ['#1C2C74', '#B3261E', '#1A1A1A'], ink: true,  chord: [49, 73.42, 98, 116.54] },
   ];
   const SEEDS = ['mist', 'rings', 'burst'];
+  const SYMS = [1, 2, 4, 6];
 
   // Параметры трёх видов частиц: угол датчиков, поворот, дальность датчиков, шаг, сохранение следа
   const P = {
@@ -213,8 +224,10 @@ uniform vec2 uRes;
 uniform uint uFrame;
 uniform vec3 uSA, uRA, uSO, uSS;
 uniform mat3 uW;
-uniform vec2 uMouse, uVel;
-uniform float uActive, uPull, uBlast, uRadius, uSwirl;
+uniform float uScale, uRadius, uHeat;
+uniform int uHN;
+uniform vec4 uHP[${MAX_HANDS}];
+uniform vec4 uHF[${MAX_HANDS}];
 out vec4 vAgent;
 
 uint hash(uint x) {
@@ -232,33 +245,43 @@ void main() {
   float h = aAgent.z;
   float s = aAgent.w;
   int si = int(s + .5);
-  float sa = pick(uSA, si), ra = pick(uRA, si), so = pick(uSO, si);
+  float sa = pick(uSA, si), ra = pick(uRA, si), so = pick(uSO, si) * uScale;
   vec3 w = si == 0 ? uW[0] : (si == 1 ? uW[1] : uW[2]);
 
   float F = sense(p, h, so, w);
   float L = sense(p, h - sa, so, w);
   float R = sense(p, h + sa, so, w);
-  float r = float(hash(uint(gl_VertexID) * 747796405u + uFrame * 2891336453u) & 0xffffu) / 65535.0;
+  uint rnd = hash(uint(gl_VertexID) * 747796405u + uFrame * 2891336453u);
+  float r1 = float(rnd & 0xffffu) / 65535.0;
+  float r2 = float(rnd >> 16) / 65535.0;
   if (F > L && F > R) {}
-  else if (F < L && F < R) h += r < .5 ? -ra : ra;
+  else if (F < L && F < R) h += r1 < .5 ? -ra : ra;
   else if (L > R) h -= ra;
   else if (R > L) h += ra;
+  h += (r2 - .5) * uHeat * 2.6;
 
-  float spd = pick(uSS, si);
-  vec2 d = uMouse - p;
-  d -= uRes * round(d / uRes);
-  float d2 = dot(d, d);
+  float spd = pick(uSS, si) * uScale * (1.0 + uHeat * .8);
   float rr = uRadius * uRadius;
-  float fall = exp(-d2 / rr);
-  float wide = exp(-d2 / (rr * 3.0));
-  if (wide > .001) {
+  for (int i = 0; i < ${MAX_HANDS}; i++) {
+    if (i >= uHN) break;
+    vec4 hp = uHP[i];
+    vec4 hf = uHF[i];
+    vec2 d = hp.xy - p;
+    d -= uRes * round(d / uRes);
+    float d2 = dot(d, d);
+    float wide = exp(-d2 / (rr * 3.0));
+    if (wide < .001) continue;
+    float fall = exp(-d2 / rr);
     float toC = atan(d.y, d.x);
-    float orbit = toC - uSwirl * mix(1.3, .55, uPull);
-    h += angDiff(orbit, h) * clamp(fall * .22 * uActive + wide * .5 * uPull, 0.0, 1.0);
-    float vl = length(uVel);
-    if (vl > .05) h += angDiff(atan(uVel.y, uVel.x), h) * fall * min(vl / 12.0, 1.0) * .45 * uActive;
-    if (uBlast > .001) h += angDiff(toC + 3.14159265, h) * min(1.0, wide * uBlast * 1.5);
-    spd *= 1.0 + fall * (.7 * uActive + 1.2 * uPull) + wide * uBlast * 4.0;
+    float pull = max(hf.y, 0.0);
+    float push = max(-hf.y, 0.0);
+    float orbit = toC - hf.w * mix(1.3, .55, pull);
+    h += angDiff(orbit, h) * clamp(fall * .22 * hf.x + wide * .5 * pull, 0.0, 1.0);
+    float vl = length(hp.zw);
+    if (vl > .05) h += angDiff(atan(hp.w, hp.z), h) * fall * min(vl / (12.0 * uScale), 1.0) * .45 * hf.x;
+    float away = max(hf.z * 1.5, push * .8) * wide;
+    if (away > .001) h += angDiff(toC + 3.14159265, h) * min(1.0, away);
+    spd *= 1.0 + fall * (.7 * hf.x + 1.2 * pull) + wide * (hf.z * 4.0 + push * 1.5);
   }
   p = mod(p + vec2(cos(h), sin(h)) * spd, uRes);
   vAgent = vec4(p, mod(h, 6.28318531), s);
@@ -304,9 +327,9 @@ uniform sampler2D uTrail;
 uniform vec2 uRes;
 uniform vec3 uKeep;
 uniform float uBias;
-uniform vec2 uA, uB;
-uniform float uBrush;
-uniform vec3 uInk;
+uniform int uHN;
+uniform vec4 uSeg[${MAX_HANDS}];
+uniform vec4 uInk[${MAX_HANDS}];
 out vec4 o;
 void main() {
   vec2 px = gl_FragCoord.xy;
@@ -317,19 +340,59 @@ void main() {
     for (int x = -1; x <= 1; x++)
       sum += textureLod(uTrail, uv + vec2(x, y) * tx, 0.0).rgb;
   vec3 c = max(sum / 9.0 * uKeep - uBias, 0.0);
-  if (dot(uInk, uInk) > 0.0) {
-    vec2 pa = px - uA, ba = uB - uA;
+  for (int i = 0; i < ${MAX_HANDS}; i++) {
+    if (i >= uHN) break;
+    vec4 ink = uInk[i];
+    if (ink.r + ink.g + ink.b <= 0.0) continue;
+    vec2 a = uSeg[i].xy, b = uSeg[i].zw;
+    vec2 pa = px - a, ba = b - a;
     float t = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
     vec2 q = pa - ba * t;
-    c += uInk * exp(-dot(q, q) / (uBrush * uBrush));
+    c += ink.rgb * exp(-dot(q, q) / (ink.w * ink.w));
   }
   o = vec4(min(c, vec3(60000.0)), 1.0);
+}`;
+
+  // Свечение: цепочка уменьшений и увеличений с мягкими фильтрами, без ступенек
+  const DOWN_FS = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uSrc;
+uniform vec2 uTexel;
+out vec4 o;
+void main() {
+  vec3 s = texture(uSrc, vUv).rgb * 4.0;
+  s += texture(uSrc, vUv + uTexel * vec2(-1.0, -1.0)).rgb;
+  s += texture(uSrc, vUv + uTexel * vec2( 1.0, -1.0)).rgb;
+  s += texture(uSrc, vUv + uTexel * vec2(-1.0,  1.0)).rgb;
+  s += texture(uSrc, vUv + uTexel * vec2( 1.0,  1.0)).rgb;
+  o = vec4(max(s / 8.0, 0.0), 1.0);
+}`;
+
+  const UP_FS = `#version 300 es
+precision highp float;
+in vec2 vUv;
+uniform sampler2D uSrc;
+uniform vec2 uTexel;
+out vec4 o;
+void main() {
+  vec2 t = uTexel;
+  vec3 s = texture(uSrc, vUv + vec2(-t.x, 0.0)).rgb;
+  s += texture(uSrc, vUv + vec2(t.x, 0.0)).rgb;
+  s += texture(uSrc, vUv + vec2(0.0, -t.y)).rgb;
+  s += texture(uSrc, vUv + vec2(0.0, t.y)).rgb;
+  s += texture(uSrc, vUv + vec2(-t.x, -t.y) * .5).rgb * 2.0;
+  s += texture(uSrc, vUv + vec2(t.x, -t.y) * .5).rgb * 2.0;
+  s += texture(uSrc, vUv + vec2(-t.x, t.y) * .5).rgb * 2.0;
+  s += texture(uSrc, vUv + vec2(t.x, t.y) * .5).rgb * 2.0;
+  o = vec4(s / 12.0, 1.0);
 }`;
 
   const DISPLAY_FS = `#version 300 es
 precision highp float;
 in vec2 vUv;
-uniform sampler2D uTrail;
+uniform sampler2D uTrail, uBloom;
+uniform vec2 uRes;
 uniform vec3 uBg, uC0, uC1, uC2, uExp;
 uniform float uInk, uTime;
 out vec4 o;
@@ -338,12 +401,34 @@ float hash(vec2 p) {
   p += dot(p, p.yx + 19.19);
   return fract((p.x + p.y) * p.x);
 }
+// Бикубическое сглаживание Catmull-Rom: клетки сетки не видны даже при сильном увеличении
+vec3 smoothTrail(vec2 uv) {
+  vec2 sp = uv * uRes;
+  vec2 t1 = floor(sp - .5) + .5;
+  vec2 f = sp - t1;
+  vec2 w0 = f * (-.5 + f * (1.0 - .5 * f));
+  vec2 w1 = 1.0 + f * f * (-2.5 + 1.5 * f);
+  vec2 w2 = f * (.5 + f * (2.0 - 1.5 * f));
+  vec2 w3 = f * f * (-.5 + .5 * f);
+  vec2 w12 = w1 + w2;
+  vec2 t0 = (t1 - 1.0) / uRes;
+  vec2 t3 = (t1 + 2.0) / uRes;
+  vec2 t12 = (t1 + w2 / w12) / uRes;
+  vec3 r = textureLod(uTrail, vec2(t0.x, t0.y), 0.0).rgb * w0.x * w0.y
+         + textureLod(uTrail, vec2(t12.x, t0.y), 0.0).rgb * w12.x * w0.y
+         + textureLod(uTrail, vec2(t3.x, t0.y), 0.0).rgb * w3.x * w0.y
+         + textureLod(uTrail, vec2(t0.x, t12.y), 0.0).rgb * w0.x * w12.y
+         + textureLod(uTrail, vec2(t12.x, t12.y), 0.0).rgb * w12.x * w12.y
+         + textureLod(uTrail, vec2(t3.x, t12.y), 0.0).rgb * w3.x * w12.y
+         + textureLod(uTrail, vec2(t0.x, t3.y), 0.0).rgb * w0.x * w3.y
+         + textureLod(uTrail, vec2(t12.x, t3.y), 0.0).rgb * w12.x * w3.y
+         + textureLod(uTrail, vec2(t3.x, t3.y), 0.0).rgb * w3.x * w3.y;
+  return max(r, 0.0);
+}
 void main() {
-  vec3 t = max(textureLod(uTrail, vUv, 0.0).rgb, 0.0);
-  vec3 b = max(textureLod(uTrail, vUv, 2.0).rgb * .5
-             + textureLod(uTrail, vUv, 4.0).rgb * .35
-             + textureLod(uTrail, vUv, 6.0).rgb * .3, 0.0);
-  vec3 a = (1.0 - exp(-t * uExp)) + (1.0 - exp(-b * uExp * .7)) * .55;
+  vec3 t = smoothTrail(vUv);
+  vec3 b = max(texture(uBloom, vUv).rgb, 0.0);
+  vec3 a = (1.0 - exp(-t * uExp)) + (1.0 - exp(-b * uExp * .13)) * .6;
   vec3 col;
   if (uInk < .5) {
     vec3 lin = uC0 * a.r + uC1 * a.g + uC2 * a.b;
@@ -360,23 +445,24 @@ void main() {
 
   // ---------- DOM ----------
   const canvas = document.getElementById('gl');
-  const ring = document.getElementById('ring');
   const brand = document.getElementById('brand');
   const hint = document.getElementById('hint');
   const palsEl = document.getElementById('pals');
   const pauseBtn = document.getElementById('pause');
+  const symBtn = document.getElementById('sym');
+  const soundBtn = document.getElementById('sound');
   const showBtn = document.getElementById('show');
   const coarse = matchMedia('(pointer: coarse)').matches;
   if (coarse) {
-    hint.textContent = 'Веди пальцем, и частицы потянутся следом. Удерживай, чтобы закрутить воронку, и отпусти, чтобы взорвать. Круги пальцем меняют направление вихря.';
+    hint.textContent = 'Веди пальцем, и частицы потянутся следом. Удерживай, чтобы закрутить воронку, и отпусти, чтобы взорвать. Каждый палец работает отдельно, а двойное касание запускает сверхновую.';
   }
 
   let gl, progs, emptyVao, tfo;
-  let W = 0, H = 0, simScale = 1, cssW = 0, cssH = 0, count = 0;
-  let bufs = [], vaos = [], texs = [], fbos = [];
+  let W = 0, H = 0, res = 1, cssW = 0, cssH = 0, count = 0;
+  let bufs = [], vaos = [], trails = [], blooms = [];
   let cur = 0, tcur = 0, frameNo = 0;
   let floatTrail = true, dep = 1, bias = 0;
-  let palette = 0, seedIdx = 0, time = 0;
+  let palette = 0, seedIdx = 0, symIdx = 0, time = 0, heat = 0;
   let running = !matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // ---------- WebGL ----------
@@ -414,18 +500,20 @@ void main() {
       upd: program(UPDATE_VS, NULL_FS, ['vAgent']),
       dep: program(DEPOSIT_VS, DEPOSIT_FS),
       dif: program(FULL_VS, DIFFUSE_FS),
+      down: program(FULL_VS, DOWN_FS),
+      up: program(FULL_VS, UP_FS),
       dis: program(FULL_VS, DISPLAY_FS),
     };
     emptyVao = gl.createVertexArray();
     tfo = gl.createTransformFeedback();
   }
 
-  function makeTrail() {
+  function makeTarget(w, h) {
     const t = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, t);
-    if (floatTrail) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, W, H, 0, gl.RGBA, gl.HALF_FLOAT, null);
-    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, W, H, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    if (floatTrail) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
@@ -434,7 +522,20 @@ void main() {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
     const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { t, f, ok };
+    return { t, f, w, h, ok };
+  }
+  function freeTarget(x) { gl.deleteTexture(x.t); gl.deleteFramebuffer(x.f); }
+
+  function buildTargets() {
+    trails = [makeTarget(W, H), makeTarget(W, H)];
+    blooms = [];
+    let bw = W, bh = H;
+    for (let i = 0; i < 6 && Math.min(bw, bh) > 12; i++) {
+      bw = Math.max(1, Math.round(bw / 2));
+      bh = Math.max(1, Math.round(bh / 2));
+      blooms.push(makeTarget(bw, bh));
+    }
+    return trails.concat(blooms).every(x => x.ok);
   }
 
   function buildSim() {
@@ -443,24 +544,22 @@ void main() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
-    simScale = Math.min(1, Math.sqrt(1.3e6 / (cssW * cssH)));
-    W = Math.max(64, Math.round(cssW * simScale));
-    H = Math.max(64, Math.round(cssH * simScale));
-    count = Math.round(Math.min(1.1e6, Math.max(9e4, W * H * .4)) / 3) * 3;
+    // Сетка модели: до 1,5 клетки на CSS-пиксель, но не больше бюджета клеток
+    const budget = coarse ? 1.1e6 : 2.2e6;
+    res = Math.max(.5, Math.min(Math.min(dpr, 1.5), Math.sqrt(budget / (cssW * cssH))));
+    W = Math.max(64, Math.round(cssW * res));
+    H = Math.max(64, Math.round(cssH * res));
+    count = Math.round(Math.min(1.2e6, Math.max(9e4, W * H * .4)) / 3) * 3;
 
-    for (const t of texs) gl.deleteTexture(t);
-    for (const f of fbos) gl.deleteFramebuffer(f);
+    for (const x of trails.concat(blooms)) freeTarget(x);
     for (const b of bufs) gl.deleteBuffer(b);
     for (const v of vaos) gl.deleteVertexArray(v);
 
-    let made = [makeTrail(), makeTrail()];
-    if (floatTrail && !made.every(m => m.ok)) {
-      for (const m of made) { gl.deleteTexture(m.t); gl.deleteFramebuffer(m.f); }
+    if (!buildTargets() && floatTrail) {
+      for (const x of trails.concat(blooms)) freeTarget(x);
       floatTrail = false;
-      made = [makeTrail(), makeTrail()];
+      buildTargets();
     }
-    texs = made.map(m => m.t);
-    fbos = made.map(m => m.f);
     dep = floatTrail ? 1 : .02;
     bias = floatTrail ? 0 : .6 / 255;
 
@@ -476,18 +575,18 @@ void main() {
     });
     gl.bindVertexArray(null);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
+    hands.clear();
     seed(SEEDS[seedIdx]);
   }
 
-  function clearTrails() {
-    for (const f of fbos) {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, f);
-      gl.viewport(0, 0, W, H);
-      gl.clearColor(0, 0, 0, 0);
+  function clearTargets() {
+    gl.clearColor(0, 0, 0, 0);
+    for (const x of trails.concat(blooms)) {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, x.f);
+      gl.viewport(0, 0, x.w, x.h);
       gl.clear(gl.COLOR_BUFFER_BIT);
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    for (const t of texs) { gl.bindTexture(gl.TEXTURE_2D, t); gl.generateMipmap(gl.TEXTURE_2D); }
   }
 
   function seed(kind) {
@@ -512,23 +611,34 @@ void main() {
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, a);
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
-    clearTrails();
+    clearTargets();
   }
 
-  // Средний уровень следа каждого вида: по нему настраивается яркость и сила «чернил» курсора
+  // Средний уровень следа каждого вида: по нему настраивается яркость и сила мазков курсора
   function means() {
     const per = count / 3 * dep / (W * H);
     return P.keep.map(k => per / (1 - k));
   }
 
-  // ---------- Курсор ----------
-  const M = {
-    x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0,
-    active: 0, pull: 0, blast: 0, swirl: 1, cross: 0,
-    radiusK: .12, ink: [0, 0, 0], inkAmt: 0, brush: 4, ghostT: 0,
-  };
-  const pointer = { x: 0, y: 0, inside: false, down: false, lastMove: -1e9, lastSeen: -1e9 };
-  let ringFlash = 0;
+  // ---------- Руки: курсор, пальцы, призрак ----------
+  const srcs = new Map();
+  const hands = new Map();
+  let lastSeen = -1e9, ghostT = 0, keySeq = 0;
+  const HP = new Float32Array(MAX_HANDS * 4);
+  const HF = new Float32Array(MAX_HANDS * 4);
+  const SEG = new Float32Array(MAX_HANDS * 4);
+  const INK = new Float32Array(MAX_HANDS * 4);
+  let emitN = 0;
+
+  function getHand(key) {
+    let h = hands.get(key);
+    if (!h) {
+      h = { key, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, active: 0, pull: 0, push: 0,
+            blast: 0, nova: 0, flash: 0, swirl: 1, cross: 0, dying: false, fresh: true, src: null };
+      hands.set(key, h);
+    }
+    return h;
+  }
 
   function ghostPos(t) {
     return [
@@ -537,54 +647,155 @@ void main() {
     ];
   }
 
-  function updateCursor(now, dt) {
-    const user = pointer.inside || pointer.down;
-    const mode = user ? 'user' : (now - pointer.lastSeen > 2500 ? 'ghost' : 'none');
-    let tx = M.x, ty = M.y, act = 0;
-    if (mode === 'user') {
-      tx = pointer.x * simScale;
-      ty = (cssH - pointer.y) * simScale;
-      act = now - pointer.lastMove < 250 ? 1 : .35;
-    } else if (mode === 'ghost') {
-      M.ghostT += dt;
-      [tx, ty] = ghostPos(M.ghostT);
-      act = .75;
+  function release(h) {
+    if (h.pull > .05) {
+      h.blast = Math.max(h.blast, h.pull);
+      h.flash = 1;
+      Snd.boom(.35 + h.pull * .65);
     }
-    M.active += (act - M.active) * Math.min(1, dt * 6);
-
-    const f = Math.max(dt * 60, .25);
-    let vx = (tx - M.x) / f, vy = (ty - M.y) / f;
-    M.px = M.x; M.py = M.y; M.x = tx; M.y = ty;
-    const jump = Math.hypot(vx, vy) * f > Math.min(W, H) * .25;
-    if (jump) { vx = vy = 0; M.px = M.x; M.py = M.y; }
-    const ovx = M.vx, ovy = M.vy;
-    M.vx = M.vx * .6 + vx * .4;
-    M.vy = M.vy * .6 + vy * .4;
-    const sp = Math.hypot(M.vx, M.vy), osp = Math.hypot(ovx, ovy);
-    if (sp > .3 && osp > .3) {
-      M.cross = M.cross * .92 + (ovx * M.vy - ovy * M.vx) / (sp * osp) * .08;
-      if (Math.abs(M.cross) > .06) M.swirl += (Math.sign(M.cross) - M.swirl) * .05;
-    }
-
-    if (pointer.down) M.pull = Math.min(1, M.pull + dt * 1.6);
-    else if (M.pull > 0) { M.blast = Math.max(M.blast, M.pull); M.pull = 0; ringFlash = 1; }
-    M.blast *= Math.exp(-dt * 3);
-    ringFlash *= Math.exp(-dt * 4);
-
-    const ph = time * .35;
-    const unit = means().reduce((a, b) => a + b) / 3;
-    const k = mode === 'none' ? 0 : unit * (Math.min(sp, 25) * .12 * M.active + (pointer.down ? 1.6 : 0));
-    M.ink = [Math.max(0, Math.cos(ph)), Math.max(0, Math.cos(ph - 2.094)), Math.max(0, Math.cos(ph + 2.094))].map(v => v * k);
-    M.brush = 4 + Math.min(sp, 30) * .5 + (pointer.down ? 6 : 0);
-
-    // Кольцо вокруг курсора
-    const show = mode === 'user' && (!coarse || pointer.down);
-    const rCss = M.radiusK * Math.min(W, H) / simScale;
-    const scale = 1 - .45 * M.pull + .6 * M.blast;
-    ring.style.width = ring.style.height = (rCss * 2) + 'px';
-    ring.style.transform = `translate(${pointer.x - rCss}px, ${pointer.y - rCss}px) scale(${scale})`;
-    ring.style.opacity = show ? String(Math.min(1, .28 + .45 * M.pull + .5 * ringFlash)) : '0';
+    h.pull = 0;
   }
+  function supernova(h) {
+    h.blast = Math.max(h.blast, 1.8);
+    h.nova = 1;
+    h.flash = 1;
+    Snd.boom(1.4);
+  }
+
+  function stepHand(h, tx, ty, act, down, push, dt) {
+    if (h.fresh) { h.x = h.px = tx; h.y = h.py = ty; h.fresh = false; }
+    const f = Math.max(dt * 60, .25);
+    let vx = (tx - h.x) / f, vy = (ty - h.y) / f;
+    h.px = h.x; h.py = h.y; h.x = tx; h.y = ty;
+    if (Math.hypot(vx, vy) * f > Math.min(W, H) * .25) { vx = vy = 0; h.px = h.x; h.py = h.y; }
+    const ovx = h.vx, ovy = h.vy;
+    h.vx = h.vx * .6 + vx * .4;
+    h.vy = h.vy * .6 + vy * .4;
+    // Тряска разогревает систему
+    const jerk = Math.hypot(h.vx - ovx, h.vy - ovy) / res;
+    heat = Math.min(1, heat + Math.max(0, jerk - 14) * .012);
+    // Круги курсором задают направление вихря
+    const sp = Math.hypot(h.vx, h.vy), osp = Math.hypot(ovx, ovy);
+    if (sp > .3 * res && osp > .3 * res) {
+      h.cross = h.cross * .92 + (ovx * h.vy - ovy * h.vx) / (sp * osp) * .08;
+      if (Math.abs(h.cross) > .06) h.swirl += (Math.sign(h.cross) - h.swirl) * .05;
+    }
+    h.active += (act - h.active) * Math.min(1, dt * 6);
+    if (down) h.pull = Math.min(1, h.pull + dt * 1.6);
+    else if (h.pull > 0) release(h);
+    h.push = push ? Math.min(1, h.push + dt * 3) : Math.max(0, h.push - dt * 3);
+    h.blast *= Math.exp(-dt * 3);
+    h.nova *= Math.exp(-dt * 5);
+    h.flash *= Math.exp(-dt * 4);
+  }
+
+  function updateHands(now, dt) {
+    const live = new Set();
+    for (const [id, s] of srcs) {
+      if (s.gone) { srcs.delete(id); continue; }
+      const h = getHand(s.key);
+      h.src = s;
+      h.dying = false;
+      live.add(s.key);
+      const moving = now - s.lastMove < 250;
+      stepHand(h, s.x * res, (cssH - s.y) * res, moving ? 1 : .35, s.left, s.right, dt);
+    }
+    if (srcs.size === 0 && now - lastSeen > 2500) {
+      ghostT += dt;
+      const [gx, gy] = ghostPos(ghostT);
+      const g = getHand('ghost');
+      g.dying = false;
+      live.add('ghost');
+      stepHand(g, gx, gy, .75, false, false, dt);
+    }
+    // Отпущенные руки затухают: воронка успевает взорваться, потом рука исчезает
+    for (const [key, h] of hands) {
+      if (live.has(key)) continue;
+      h.dying = true;
+      stepHand(h, h.x, h.y, 0, false, false, dt);
+      if (h.blast < .01 && h.active < .02 && h.nova < .01 && h.push < .01) hands.delete(key);
+    }
+    heat *= Math.exp(-dt * 1.2);
+  }
+
+  function symCopies(x, y, px, py, vx, vy, sw) {
+    const sym = SYMS[symIdx];
+    const out = [[x, y, px, py, vx, vy, sw]];
+    if (sym === 6) {
+      const cx = W / 2, cy = H / 2;
+      for (let k = 1; k < 6; k++) {
+        const a = k * TAU / 6, c = Math.cos(a), s = Math.sin(a);
+        out.push([
+          cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c,
+          cx + (px - cx) * c - (py - cy) * s, cy + (px - cx) * s + (py - cy) * c,
+          vx * c - vy * s, vx * s + vy * c, sw,
+        ]);
+      }
+    } else if (sym >= 2) {
+      out.push([W - x, y, W - px, py, -vx, vy, -sw]);
+      if (sym === 4) {
+        out.push([x, H - y, px, H - py, vx, -vy, -sw]);
+        out.push([W - x, H - y, W - px, H - py, -vx, -vy, sw]);
+      }
+    }
+    return out;
+  }
+
+  function buildEmit() {
+    const unit = means().reduce((a, b) => a + b) / 3;
+    let n = 0, hi = 0;
+    for (const h of hands.values()) {
+      if (n >= MAX_HANDS) break;
+      const spCss = Math.hypot(h.vx, h.vy) / res;
+      const inkK = unit * (Math.min(spCss, 25) * .12 * h.active + h.pull * 1.6);
+      const white = unit * 7 * h.nova;
+      const brush = res * (4 + Math.min(spCss, 30) * .5 + h.pull * 6 + h.nova * 26);
+      const copies = symCopies(h.x, h.y, h.px, h.py, h.vx, h.vy, h.swirl);
+      copies.forEach((c, k) => {
+        if (n >= MAX_HANDS) return;
+        let [x, y, px, py, vx, vy, sw] = c;
+        const wx = ((x % W) + W) % W, wy = ((y % H) + H) % H;
+        px += wx - x; py += wy - y; x = wx; y = wy;
+        const o = n * 4;
+        HP[o] = x; HP[o + 1] = y; HP[o + 2] = vx; HP[o + 3] = vy;
+        HF[o] = h.active; HF[o + 1] = h.pull - h.push; HF[o + 2] = h.blast; HF[o + 3] = sw;
+        SEG[o] = px; SEG[o + 1] = py; SEG[o + 2] = x; SEG[o + 3] = y;
+        const ph = time * .35 + (hi * 3 + k) * 1.1;
+        INK[o] = Math.max(0, Math.cos(ph)) * inkK + white;
+        INK[o + 1] = Math.max(0, Math.cos(ph - 2.094)) * inkK + white;
+        INK[o + 2] = Math.max(0, Math.cos(ph + 2.094)) * inkK + white;
+        INK[o + 3] = brush;
+        n++;
+      });
+      hi++;
+    }
+    emitN = n;
+  }
+
+  // Кольца вокруг курсора и пальцев
+  const rings = [];
+  function updateRings() {
+    const rCss = radiusK * Math.min(W, H) / res;
+    let i = 0;
+    for (const h of hands.values()) {
+      if (h.key === 'ghost' || !h.src) continue;
+      if (!rings[i]) {
+        const el = document.createElement('div');
+        el.className = 'ring';
+        el.setAttribute('aria-hidden', 'true');
+        document.body.insertBefore(el, canvas.nextSibling);
+        rings[i] = el;
+      }
+      const el = rings[i++];
+      const show = !h.dying && (!coarse || h.src.left);
+      const scale = Math.max(.2, 1 - .45 * h.pull + .3 * h.push + .6 * h.blast);
+      el.style.width = el.style.height = (rCss * 2) + 'px';
+      el.style.transform = `translate(${h.src.x - rCss}px, ${h.src.y - rCss}px) scale(${scale})`;
+      el.style.opacity = show ? String(Math.min(1, .28 + .45 * h.pull + .4 * h.push + .5 * Math.max(h.flash, ringFlash))) : '0';
+    }
+    for (; i < rings.length; i++) rings[i].style.opacity = '0';
+  }
+  let radiusK = .12, ringFlash = 0;
 
   // ---------- Мутации ----------
   const rand = (a, b) => a + Math.random() * (b - a);
@@ -604,12 +815,21 @@ void main() {
   }
 
   // ---------- Кадр ----------
-  function simStep(withCursor) {
+  function fullscreenPass(prog, target) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.f : null);
+    if (target) gl.viewport(0, 0, target.w, target.h);
+    else gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.bindVertexArray(emptyVao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  function simStep(withHands) {
+    const n = withHands ? emitN : 0;
     const up = progs.upd;
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.useProgram(up.p);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
+    gl.bindTexture(gl.TEXTURE_2D, trails[tcur].t);
     gl.uniform1i(up.u.uTrail, 0);
     gl.uniform2f(up.u.uRes, W, H);
     gl.uniform1ui(up.u.uFrame, frameNo++);
@@ -619,13 +839,12 @@ void main() {
     gl.uniform3f(up.u.uSS, P.ss[0], P.ss[1], P.ss[2]);
     const c = P.cross;
     gl.uniformMatrix3fv(up.u.uW, false, [1, c, c, c, 1, c, c, c, 1]);
-    gl.uniform2f(up.u.uMouse, M.x, M.y);
-    gl.uniform2f(up.u.uVel, M.vx, M.vy);
-    gl.uniform1f(up.u.uActive, withCursor ? M.active : 0);
-    gl.uniform1f(up.u.uPull, withCursor ? M.pull : 0);
-    gl.uniform1f(up.u.uBlast, withCursor ? M.blast : 0);
-    gl.uniform1f(up.u.uRadius, M.radiusK * Math.min(W, H));
-    gl.uniform1f(up.u.uSwirl, M.swirl);
+    gl.uniform1f(up.u.uScale, res);
+    gl.uniform1f(up.u.uRadius, radiusK * Math.min(W, H));
+    gl.uniform1f(up.u.uHeat, withHands ? heat : 0);
+    gl.uniform1i(up.u.uHN, n);
+    gl.uniform4fv(up.u.uHP, HP);
+    gl.uniform4fv(up.u.uHF, HF);
 
     gl.bindVertexArray(vaos[cur]);
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
@@ -642,7 +861,7 @@ void main() {
 
     // След
     const dp = progs.dep;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbos[tcur]);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, trails[tcur].f);
     gl.viewport(0, 0, W, H);
     gl.useProgram(dp.p);
     gl.uniform2f(dp.u.uRes, W, H);
@@ -653,27 +872,44 @@ void main() {
     gl.drawArrays(gl.POINTS, 0, count);
     gl.disable(gl.BLEND);
 
-    // Размытие, испарение и мазок курсора
+    // Размытие, испарение и мазки
     const df = progs.dif;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbos[1 - tcur]);
     gl.useProgram(df.p);
-    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
+    gl.bindTexture(gl.TEXTURE_2D, trails[tcur].t);
     gl.uniform1i(df.u.uTrail, 0);
     gl.uniform2f(df.u.uRes, W, H);
     gl.uniform3f(df.u.uKeep, P.keep[0], P.keep[1], P.keep[2]);
     gl.uniform1f(df.u.uBias, bias);
-    gl.uniform2f(df.u.uA, M.px, M.py);
-    gl.uniform2f(df.u.uB, M.x, M.y);
-    gl.uniform1f(df.u.uBrush, M.brush);
-    if (withCursor) gl.uniform3f(df.u.uInk, M.ink[0], M.ink[1], M.ink[2]);
-    else gl.uniform3f(df.u.uInk, 0, 0, 0);
-    gl.bindVertexArray(emptyVao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.uniform1i(df.u.uHN, n);
+    gl.uniform4fv(df.u.uSeg, SEG);
+    gl.uniform4fv(df.u.uInk, INK);
+    fullscreenPass(df, trails[1 - tcur]);
     tcur = 1 - tcur;
+  }
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
-    gl.generateMipmap(gl.TEXTURE_2D);
+  function bloom() {
+    const dn = progs.down, upp = progs.up;
+    gl.activeTexture(gl.TEXTURE0);
+    gl.useProgram(dn.p);
+    gl.uniform1i(dn.u.uSrc, 0);
+    let src = trails[tcur];
+    for (const b of blooms) {
+      gl.bindTexture(gl.TEXTURE_2D, src.t);
+      gl.uniform2f(dn.u.uTexel, 1 / src.w, 1 / src.h);
+      fullscreenPass(dn, b);
+      src = b;
+    }
+    gl.useProgram(upp.p);
+    gl.uniform1i(upp.u.uSrc, 0);
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE);
+    for (let i = blooms.length - 2; i >= 0; i--) {
+      const s = blooms[i + 1];
+      gl.bindTexture(gl.TEXTURE_2D, s.t);
+      gl.uniform2f(upp.u.uTexel, 1 / s.w, 1 / s.h);
+      fullscreenPass(upp, blooms[i]);
+    }
+    gl.disable(gl.BLEND);
   }
 
   function hexVec(h) {
@@ -684,12 +920,14 @@ void main() {
   function draw() {
     const pal = PALETTES[palette];
     const ds = progs.dis;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, canvas.width, canvas.height);
     gl.useProgram(ds.p);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, blooms[0].t);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, texs[tcur]);
+    gl.bindTexture(gl.TEXTURE_2D, trails[tcur].t);
     gl.uniform1i(ds.u.uTrail, 0);
+    gl.uniform1i(ds.u.uBloom, 1);
+    gl.uniform2f(ds.u.uRes, W, H);
     gl.uniform3fv(ds.u.uBg, hexVec(pal.bg));
     gl.uniform3fv(ds.u.uC0, hexVec(pal.c[0]));
     gl.uniform3fv(ds.u.uC1, hexVec(pal.c[1]));
@@ -699,8 +937,7 @@ void main() {
     gl.uniform3f(ds.u.uExp, k / m[0], k / m[1], k / m[2]);
     gl.uniform1f(ds.u.uInk, pal.ink ? 1 : 0);
     gl.uniform1f(ds.u.uTime, time);
-    gl.bindVertexArray(emptyVao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    fullscreenPass(ds, null);
   }
 
   let last = performance.now();
@@ -708,18 +945,188 @@ void main() {
     const dt = Math.min(.05, (now - last) / 1000);
     last = now;
     if (running) time += dt;
-    updateCursor(now, dt);
+    updateHands(now, dt);
+    ringFlash *= Math.exp(-dt * 4);
     lerpParams(dt);
-    if (running) simStep(true);
+    buildEmit();
+    if (running) { simStep(true); bloom(); }
     draw();
+    updateRings();
+    Snd.update(dt);
     requestAnimationFrame(frame);
   }
+
+  // ---------- Звук ----------
+  const Snd = {
+    ctx: null, on: false,
+    init() {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return false;
+      const ctx = this.ctx = new AC();
+      const master = this.master = ctx.createGain();
+      master.gain.value = 0;
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16;
+      comp.ratio.value = 4;
+      master.connect(comp);
+      comp.connect(ctx.destination);
+
+      const rev = this.rev = ctx.createConvolver();
+      rev.buffer = this.impulse(3.2, 2.6);
+      const wet = ctx.createGain();
+      wet.gain.value = .5;
+      rev.connect(wet);
+      wet.connect(master);
+
+      // Гул
+      const df = this.dFilter = ctx.createBiquadFilter();
+      df.type = 'lowpass';
+      df.frequency.value = 300;
+      df.Q.value = .8;
+      const dg = ctx.createGain();
+      dg.gain.value = .15;
+      df.connect(dg);
+      dg.connect(master);
+      dg.connect(rev);
+      this.oscs = [.5, .3, .22, .16].map((g, i) => {
+        const o = ctx.createOscillator();
+        o.type = i % 2 ? 'triangle' : 'sine';
+        o.detune.value = (i - 1.5) * 4;
+        const gn = ctx.createGain();
+        gn.gain.value = g;
+        o.connect(gn);
+        gn.connect(df);
+        o.start();
+        return o;
+      });
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = .07;
+      const lg = ctx.createGain();
+      lg.gain.value = 120;
+      lfo.connect(lg);
+      lg.connect(df.frequency);
+      lfo.start();
+
+      // Ветер от движения
+      this.noiseBuf = this.noise(2);
+      const n = ctx.createBufferSource();
+      n.buffer = this.noiseBuf;
+      n.loop = true;
+      const nf = this.nFilter = ctx.createBiquadFilter();
+      nf.type = 'bandpass';
+      nf.frequency.value = 800;
+      nf.Q.value = 1.3;
+      const ng = this.nGain = ctx.createGain();
+      ng.gain.value = 0;
+      n.connect(nf);
+      nf.connect(ng);
+      ng.connect(master);
+      ng.connect(rev);
+      n.start();
+
+      // Зарядка воронки
+      const co = this.cOsc = ctx.createOscillator();
+      co.type = 'sawtooth';
+      co.frequency.value = 55;
+      const cf = this.cFilter = ctx.createBiquadFilter();
+      cf.type = 'lowpass';
+      cf.frequency.value = 200;
+      cf.Q.value = 6;
+      const cg = this.cGain = ctx.createGain();
+      cg.gain.value = 0;
+      co.connect(cf);
+      cf.connect(cg);
+      cg.connect(master);
+      cg.connect(rev);
+      co.start();
+
+      this.setChord(palette);
+      return true;
+    },
+    impulse(sec, decay) {
+      const ctx = this.ctx, len = Math.round(ctx.sampleRate * sec);
+      const b = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let ch = 0; ch < 2; ch++) {
+        const d = b.getChannelData(ch);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+      }
+      return b;
+    },
+    noise(sec) {
+      const ctx = this.ctx, len = Math.round(ctx.sampleRate * sec);
+      const b = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = b.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      return b;
+    },
+    setChord(i) {
+      if (!this.ctx) return;
+      const t = this.ctx.currentTime;
+      PALETTES[i].chord.forEach((f, k) => this.oscs[k].frequency.setTargetAtTime(f, t, .6));
+    },
+    toggle() {
+      if (!this.ctx && !this.init()) return;
+      this.on = !this.on;
+      const t = this.ctx.currentTime;
+      if (this.on) this.ctx.resume();
+      this.master.gain.cancelScheduledValues(t);
+      this.master.gain.setTargetAtTime(this.on ? .85 : 0, t, .25);
+      soundBtn.setAttribute('aria-pressed', String(this.on));
+    },
+    update(dt) {
+      if (!this.on) return;
+      let h = null;
+      for (const x of hands.values()) { if (!h || (x.key !== 'ghost' && h.key === 'ghost')) h = x; }
+      const t = this.ctx.currentTime;
+      const sp = h ? Math.hypot(h.vx, h.vy) / res * h.active : 0;
+      const yN = h ? h.y / H : .5;
+      const pull = h ? h.pull : 0;
+      this.nGain.gain.setTargetAtTime(Math.min(.35, sp * .018) + heat * .18, t, .08);
+      this.nFilter.frequency.setTargetAtTime(250 + yN * 2600 + Math.min(sp, 40) * 20, t, .1);
+      this.dFilter.frequency.setTargetAtTime(260 + Math.min(sp, 40) * 22 + pull * 1100, t, .2);
+      this.cGain.gain.setTargetAtTime(pull * .1, t, .05);
+      this.cOsc.frequency.setTargetAtTime(55 + pull * 110, t, .1);
+      this.cFilter.frequency.setTargetAtTime(150 + pull * 1800, t, .1);
+    },
+    boom(power) {
+      if (!this.on) return;
+      const ctx = this.ctx, t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(32, t + .7);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(.0001, t);
+      g.gain.exponentialRampToValueAtTime(.9 * power, t + .01);
+      g.gain.exponentialRampToValueAtTime(.0001, t + 1.4);
+      o.connect(g);
+      g.connect(this.master);
+      o.start(t);
+      o.stop(t + 1.5);
+      const n = ctx.createBufferSource();
+      n.buffer = this.noiseBuf;
+      const f = ctx.createBiquadFilter();
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(4000, t);
+      f.frequency.exponentialRampToValueAtTime(120, t + 1.2);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(.45 * power, t);
+      ng.gain.exponentialRampToValueAtTime(.0001, t + 1.3);
+      n.connect(f);
+      f.connect(ng);
+      ng.connect(this.master);
+      ng.connect(this.rev);
+      n.start(t);
+      n.stop(t + 1.4);
+    },
+  };
 
   // ---------- Управление ----------
   function setPalette(i) {
     palette = i;
     document.body.style.background = PALETTES[i].bg;
     for (const b of palsEl.children) b.setAttribute('aria-pressed', String(+b.dataset.i === i));
+    Snd.setChord(i);
   }
   PALETTES.forEach((p, i) => {
     const b = document.createElement('button');
@@ -741,6 +1148,12 @@ void main() {
   function reseed() {
     seedIdx = (seedIdx + 1) % SEEDS.length;
     seed(SEEDS[seedIdx]);
+    bloom();
+  }
+  function cycleSym() {
+    symIdx = (symIdx + 1) % SYMS.length;
+    symBtn.firstChild.textContent = 'Симметрия ×' + SYMS[symIdx];
+    symBtn.setAttribute('aria-pressed', String(symIdx > 0));
   }
   function setBare(v) {
     document.body.classList.toggle('bare', v);
@@ -748,54 +1161,91 @@ void main() {
   }
   document.getElementById('mutate').addEventListener('click', mutate);
   document.getElementById('reseed').addEventListener('click', reseed);
+  symBtn.addEventListener('click', cycleSym);
+  soundBtn.addEventListener('click', () => Snd.toggle());
   pauseBtn.addEventListener('click', () => setRunning(!running));
   document.getElementById('hide').addEventListener('click', () => setBare(true));
   showBtn.addEventListener('click', () => setBare(false));
 
   document.addEventListener('keydown', e => {
     if (e.target.closest && e.target.closest('button') && (e.code === 'Space' || e.code === 'Enter')) return;
+    if (e.repeat && e.code !== 'KeyM') return;
     if (e.code === 'Space') { e.preventDefault(); setRunning(!running); }
     else if (e.code === 'KeyR') reseed();
     else if (e.code === 'KeyM') mutate();
+    else if (e.code === 'KeyK') cycleSym();
+    else if (e.code === 'KeyS') Snd.toggle();
     else if (e.code === 'KeyH') setBare(!document.body.classList.contains('bare'));
     else if (/^Digit[1-5]$/.test(e.code)) setPalette(+e.code.slice(5) - 1);
   });
 
+  // Указатели: мышь, перо и каждый палец
   let quietTimer = 0;
   function quietSoon(ms) {
-    if (quietTimer) return;
-    quietTimer = setTimeout(() => brand.classList.add('quiet'), ms);
+    if (!quietTimer) quietTimer = setTimeout(() => brand.classList.add('quiet'), ms);
   }
+  function srcFor(e) {
+    let s = srcs.get(e.pointerId);
+    if (!s || s.gone) {
+      s = { id: e.pointerId, key: 'p' + (++keySeq), x: e.clientX, y: e.clientY,
+            left: false, right: false, gone: false, lastMove: 0, mouse: e.pointerType === 'mouse' };
+      srcs.set(e.pointerId, s);
+    }
+    return s;
+  }
+  function touchButtons(s, e) {
+    if (s.mouse) { s.left = !!(e.buttons & 1); s.right = !!(e.buttons & 2); }
+  }
+  let lastTap = { t: 0, x: 0, y: 0 };
   canvas.addEventListener('pointermove', e => {
-    pointer.x = e.clientX; pointer.y = e.clientY;
-    pointer.inside = true;
-    pointer.lastMove = pointer.lastSeen = performance.now();
+    const s = srcFor(e);
+    s.x = e.clientX; s.y = e.clientY;
+    touchButtons(s, e);
+    s.lastMove = lastSeen = performance.now();
     quietSoon(9000);
   });
   canvas.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    pointer.x = e.clientX; pointer.y = e.clientY;
-    pointer.inside = true;
-    pointer.down = true;
-    pointer.lastMove = pointer.lastSeen = performance.now();
+    const s = srcFor(e);
+    s.x = e.clientX; s.y = e.clientY;
+    if (s.mouse) touchButtons(s, e); else s.left = true;
+    s.lastMove = lastSeen = performance.now();
     canvas.setPointerCapture(e.pointerId);
     document.body.classList.add('painting');
     quietSoon(2500);
+    if (!s.mouse) {
+      const now = performance.now();
+      if (now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 40) {
+        s.nova = true;
+        lastTap.t = 0;
+      } else {
+        lastTap = { t: now, x: e.clientX, y: e.clientY };
+      }
+    }
   });
-  function release(e) {
-    pointer.down = false;
-    pointer.lastSeen = performance.now();
-    if (e.pointerType !== 'mouse') pointer.inside = false;
-    document.body.classList.remove('painting');
+  function lift(e) {
+    const s = srcs.get(e.pointerId);
+    if (!s) return;
+    lastSeen = performance.now();
+    if (s.mouse && e.type === 'pointerup') touchButtons(s, e);
+    else s.gone = true;
+    if (s.nova) { const h = hands.get(s.key); if (h) { h.pull = 0; supernova(h); } s.nova = false; }
+    if (![...srcs.values()].some(x => !x.gone && x.left)) document.body.classList.remove('painting');
   }
-  canvas.addEventListener('pointerup', release);
-  canvas.addEventListener('pointercancel', release);
+  canvas.addEventListener('pointerup', lift);
+  canvas.addEventListener('pointercancel', lift);
   canvas.addEventListener('pointerleave', e => {
-    if (e.pointerType === 'mouse' && !pointer.down) { pointer.inside = false; pointer.lastSeen = performance.now(); }
+    const s = srcs.get(e.pointerId);
+    if (s && s.mouse && !s.left && !s.right) { s.gone = true; lastSeen = performance.now(); }
   });
+  canvas.addEventListener('dblclick', e => {
+    const s = srcs.get(e.pointerId !== undefined ? e.pointerId : 1) || [...srcs.values()].find(x => x.mouse);
+    const h = s && hands.get(s.key);
+    if (h) { h.pull = 0; supernova(h); }
+  });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
   canvas.addEventListener('wheel', e => {
     e.preventDefault();
-    M.radiusK = Math.min(.35, Math.max(.04, M.radiusK * Math.exp(-e.deltaY * .0012)));
+    radiusK = Math.min(.35, Math.max(.04, radiusK * Math.exp(-e.deltaY * .0012)));
     ringFlash = 1;
   }, { passive: false });
 
@@ -803,12 +1253,18 @@ void main() {
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (Math.abs(canvas.clientWidth - cssW) > 2 || Math.abs(canvas.clientHeight - cssH) > 2) buildSim();
+      if (Math.abs(canvas.clientWidth - cssW) > 2 || Math.abs(canvas.clientHeight - cssH) > 2) {
+        buildSim();
+        bloom();
+      }
     }, 250);
   });
 
   canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); running = false; });
-  canvas.addEventListener('webglcontextrestored', () => { setup(); buildSim(); setRunning(true); });
+  canvas.addEventListener('webglcontextrestored', () => {
+    trails = []; blooms = []; bufs = []; vaos = [];
+    setup(); buildSim(); bloom(); setRunning(true);
+  });
 
   function fail(err) {
     console.error(err);
@@ -824,6 +1280,7 @@ void main() {
     setup();
     buildSim();
     for (let i = 0; i < 140; i++) simStep(false);
+    bloom();
     setPalette(0);
     setRunning(running);
     requestAnimationFrame(frame);
